@@ -2,7 +2,7 @@
 
 **Live ADS-B data from the OpenSky Network → Airflow → Azure Blob Storage → dbt (models + tests) → dashboard. Runs in Docker, verified by GitHub Actions.**
 
-![CI](https://github.com/<your-github-username>/opensky-flight-pipeline/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue) ![Airflow](https://img.shields.io/badge/Airflow-3.1-017CEE) ![dbt](https://img.shields.io/badge/dbt-duckdb-FF694B) ![Azure](https://img.shields.io/badge/Azure-Blob-0078D4)
 
 <!-- Add a screenshot after the first live run: docs/img/dashboard.png -->
@@ -133,7 +133,7 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 **Prerequisites:** Docker Desktop, Git, a free [OpenSky account](https://opensky-network.org) → Account → *API client* (client id + secret).
 
 ```bash
-git clone https://github.com/<you>/opensky-flight-pipeline && cd opensky-flight-pipeline
+git clone https://github.com/chiranjeev89/opensky-flight-pipeline && cd opensky-flight-pipeline
 cp .env.example .env            # paste OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET
 docker compose up -d --build    # Airflow  http://localhost:8080  (no login locally)
                                 # Dashboard http://localhost:8501

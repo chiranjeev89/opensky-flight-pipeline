@@ -60,7 +60,7 @@ def main() -> None:
     print(f"| Ingest runs landed | {runs:,} |")
     print(f"| Schedule completeness (full days) | {completeness}% |")
     print(f"| State vectors stored | {rows:,} |")
-    print(f"| Storage used | {mb} MB Parquet |")
+    print(f"| Storage used | {mb:.2f} MB Parquet |")
     print(f"| API latency avg / p95 | {avg_lat:.0f} ms / {p95_lat:.0f} ms |")
     print(f"| Unique aircraft seen | {aircraft:,} |")
     print(f"| Peak airborne aircraft in one hour | {peak[1]} at {peak[0]:%Y-%m-%d %H:00} UTC |")
