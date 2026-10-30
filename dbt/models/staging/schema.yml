@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: stg_state_vectors
+    description: Cleaned, deduplicated state vectors. Grain = one aircraft per snapshot.
+    data_tests:
+      - dbt_utils_free_unique_combo:
+          arguments:
+            columns: ["icao24", "snapshot_ts"]
+    columns:
+      - name: icao24
+        description: ICAO 24-bit transponder address, lower-case hex.
+        data_tests: [not_null]
+      - name: snapshot_ts
+        data_tests: [not_null]
+      - name: on_ground
+        data_tests: [not_null]
+      - name: position_source
+        description: 0=ADS-B 1=ASTERIX 2=MLAT 3=FLARM
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3]
+              config:
+                where: "position_source is not null"
+
+  - name: stg_pipeline_runs
+    columns:
+      - name: snapshot_ts
+        data_tests: [not_null, unique]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["success"]

@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: fct_flight_phases
+    columns:
+      - name: flight_phase
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["ground", "climb", "descent", "cruise", "level_low", "unknown"]
+  - name: fct_traffic_hourly
+    description: Headline metric. One row per hour.
+    columns:
+      - name: snapshot_hour
+        data_tests: [not_null, unique]
+      - name: unique_aircraft
+        data_tests: [not_null]
+  - name: dim_aircraft
+    columns:
+      - name: icao24
+        data_tests: [not_null, unique]
+  - name: fct_country_mix
+    columns:
+      - name: origin_country
+        data_tests: [unique]
+  - name: fct_pipeline_health
+    columns:
+      - name: run_date
+        data_tests: [not_null, unique]
+  - name: fct_data_quality
+    columns:
+      - name: run_date
+        data_tests: [not_null, unique]

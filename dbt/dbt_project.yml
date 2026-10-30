@@ -1,0 +1,31 @@
+name: flight_ops
+version: "1.0.0"
+config-version: 2
+profile: flight_ops
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Physical sanity limits (docs/DATA.md). Values outside these are sensor errors.
+  max_altitude_ft: 60000
+  min_altitude_ft: -1500
+  max_ground_speed_kt: 750
+  # Vertical rate threshold separating climb/descent from level flight (m/s)
+  level_flight_vr_ms: 2.5
+  max_staleness_hours: 3
+  # Must match the BBOX_* env vars used by the ingest DAG
+  bbox_lamin: 47.27
+  bbox_lomin: 5.87
+  bbox_lamax: 55.06
+  bbox_lomax: 15.04
+
+models:
+  flight_ops:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

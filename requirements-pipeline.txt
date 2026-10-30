@@ -1,0 +1,4 @@
+# Runtime deps for src/flightpipe (installed into the Airflow image).
+requests>=2.32,<3
+pyarrow>=17,<27
+azure-storage-blob>=12.20,<13

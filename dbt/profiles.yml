@@ -1,0 +1,23 @@
+# No secrets here: DuckDB is a local file. Paths come from env vars so the
+# same project runs in Docker, in CI and on a laptop (docs/CONSTRAINTS.md C-03).
+flight_ops:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../data/lake/warehouse.duckdb') }}"
+      threads: 4
+      settings:
+        TimeZone: UTC   # BUG-004: hourly buckets must not depend on the machine's timezone
+    docker:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '/opt/lake/warehouse.duckdb') }}"
+      threads: 4
+      settings:
+        TimeZone: UTC   # BUG-004: hourly buckets must not depend on the machine's timezone
+    ci:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../data/lake/warehouse.duckdb') }}"
+      threads: 2
+      settings:
+        TimeZone: UTC

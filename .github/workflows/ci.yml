@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: CI only needs to read the repo (docs/THREAT.md T-05)
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Unit tests (HTTP mocked, no credits spent)
+        run: pytest -q
+
+  dbt-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Generate synthetic lake (same serializer as production)
+        run: python scripts/generate_sample_data.py --out data/lake --hours 48
+      - name: dbt build (models + all data tests)
+        working-directory: dbt
+        env:
+          LOCAL_LAKE_DIR: ${{ github.workspace }}/data/lake
+          DBT_DUCKDB_PATH: ${{ github.workspace }}/data/lake/warehouse.duckdb
+        run: dbt build --profiles-dir . --target ci
+      - name: Results table from CI data
+        run: |
+          cp data/lake/warehouse.duckdb data/lake/serving.duckdb
+          python scripts/measure_pipeline.py --db data/lake/serving.duckdb >> "$GITHUB_STEP_SUMMARY"
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: |
+          cp .env.example .env
+          docker compose build
+      - name: DAGs import cleanly inside the real Airflow image
+        run: |
+          docker compose run --rm --no-deps --entrypoint "" airflow-scheduler \
+            python -c "from airflow.models import DagBag; b=DagBag('/opt/airflow/dags', include_examples=False); print(b.dag_ids); assert not b.import_errors, b.import_errors"

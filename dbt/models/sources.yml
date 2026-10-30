@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: lake
+    description: >
+      Raw Parquet landed by the opensky_ingest DAG and synced from Azure Blob to
+      the local lake cache. Hive partitions (date=, hour=) are read as columns.
+    tables:
+      - name: raw_states
+        description: One row per aircraft per 10-minute snapshot, exactly as OpenSky sent it.
+        meta:
+          external_location: "read_parquet('{{ env_var('LOCAL_LAKE_DIR', '../data/lake') }}/raw/states/**/*.parquet', hive_partitioning = true, union_by_name = true)"
+      - name: raw_runs
+        description: One row per ingest run with latency, row count and credits remaining.
+        meta:
+          external_location: "read_parquet('{{ env_var('LOCAL_LAKE_DIR', '../data/lake') }}/raw/runs/**/*.parquet', hive_partitioning = true, union_by_name = true)"
