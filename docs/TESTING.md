@@ -7,8 +7,9 @@ Real commands and what a pass looks like. Paste real output, never "tests pass".
 | 1 | `ruff check . && ruff format --check .` | `All checks passed!` |
 | 2 | `pytest -q` | `16 passed, 1 skipped` (DAG import test skips without Airflow; it runs in CI docker job) |
 | 3 | `make sample` | `Wrote 433 synthetic snapshots to data/lake` |
-| 4 | `make dbt` | `Done. PASS=33 WARN=0 ERROR=0 SKIP=0` |
-| 5 | **Negative test**: `python scripts/inject_bad_snapshot.py` then `make dbt` (undo with `--remove`) | `FAIL 1 assert_altitude_physically_possible`, `FAIL 1 assert_speed_physically_possible`, `FAIL 1 assert_positions_inside_bbox`, `SKIP=15` (marts not built → nothing published) |
+| 4 | `make dbt` | `Done. PASS=34 WARN=0 ERROR=0 SKIP=0` |
+| 5 | **Negative test**: `python scripts/inject_bad_snapshot.py` then `make dbt` (undo with `--remove`) | `FAIL 1 assert_no_systemic_glitches`, 18 nodes `SKIP` (marts not built → nothing published) |
+| 5b | **Glitch test**: set `velocity` of 2 rows in one normal snapshot to 500 m/s, then `make dbt` | `PASS=34`; `fct_data_quality.implausible_rows` = 2; max speed in `fct_flight_phases` stays realistic |
 | 6 | `make measure` | Markdown results table |
 | 7 | `docker compose up -d --build` then open http://localhost:8080 | Both DAGs listed, unpaused, `opensky_ingest` green within 10 min |
 | 8 | Azurite check: `az storage blob list --connection-string "$AZURITE" -c flight-lake -o table` (or Azure Storage Explorer) | `raw/states/date=.../states_*.parquet` files |
@@ -26,7 +27,8 @@ Open dashboard → KPIs non-zero → chart has the last 24 h → map shows dots 
 ```
 ruff: All checks passed!
 pytest: 16 passed, 1 skipped in 0.82s
-dbt build: Done. PASS=33 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=33
-negative test: 3 FAIL, 15 SKIP (publish blocked)
+dbt build: Done. PASS=34 WARN=0 ERROR=0 SKIP=0 TOTAL=34 (33 before BUG-009)
+negative test: 1 FAIL (systemic), 18 SKIP (publish blocked)
+glitch test (2026-10-31): 2 implausible rows flagged, PASS=34
 dashboard AppTest: no exceptions; metrics rendered
 ```

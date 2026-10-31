@@ -11,7 +11,8 @@ stg as (
         round(100.0 * avg(case when not has_position then 1 else 0 end), 2)     as pct_missing_position,
         round(100.0 * avg(case when altitude_ft is null then 1 else 0 end), 2)  as pct_missing_altitude,
         round(100.0 * avg(case when callsign is null then 1 else 0 end), 2)     as pct_missing_callsign,
-        round(avg(seconds_since_contact), 1)                                     as avg_seconds_since_contact
+        round(avg(seconds_since_contact), 1)                                     as avg_seconds_since_contact,
+        sum(case when not is_plausible then 1 else 0 end)                        as implausible_rows
     from {{ ref('stg_state_vectors') }}
     group by 1
 )
@@ -23,5 +24,6 @@ select
     stg.pct_missing_position,
     stg.pct_missing_altitude,
     stg.pct_missing_callsign,
-    stg.avg_seconds_since_contact
+    stg.avg_seconds_since_contact,
+    stg.implausible_rows
 from stg join raw using (d)

@@ -104,7 +104,8 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 | Rows missing position | 2.09% |
 | dbt build | **33 / 33 PASS** (8 models, 25 tests) in 5.6 s |
 | Unit tests | 16 passed (+1 DAG import test run in CI Docker job) |
-| **Negative test**: injected impossible snapshot (98,000 ft, 900 m/s, lat/lon swapped) | **3 tests FAIL → 15 downstream nodes SKIPPED → nothing published** ✅ |
+| **Negative test**: injected impossible snapshot (98,000 ft, 900 m/s, lat/lon swapped) | **systemic-glitch test FAILS → 18 downstream nodes SKIPPED → nothing published** ✅ |
+| **Real-world glitch handling** (found in live data, BUG-009) | 2 transponder glitches (> 750 kt) flagged and excluded, counted in `implausible_rows`, publish continues ✅ |
 
 ## 5. Why it works
 

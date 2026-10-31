@@ -37,6 +37,24 @@ deduped as (
     qualify row_number() over (
         partition by icao24, snapshot_ts order by ingested_at desc
     ) = 1
+),
+
+flagged as (
+    -- BUG-009: real ADS-B feeds contain occasional transponder glitches
+    -- (e.g. 2 aircraft reporting > 750 kt). Flag them instead of letting one
+    -- bad aircraft block the whole publish. Marts use only plausible rows;
+    -- the systemic test below still fails if MANY rows are implausible.
+    select
+        *,
+        not (
+            coalesce(ground_speed_kt, 0) > {{ var('max_ground_speed_kt') }}
+            or (not on_ground and altitude_ft is not null
+                and (altitude_ft > {{ var('max_altitude_ft') }} or altitude_ft < {{ var('min_altitude_ft') }}))
+            or (has_position and (
+                latitude  not between {{ var('bbox_lamin') }} - 1 and {{ var('bbox_lamax') }} + 1
+                or longitude not between {{ var('bbox_lomin') }} - 1 and {{ var('bbox_lomax') }} + 1))
+        ) as is_plausible
+    from deduped
 )
 
-select * from deduped
+select * from flagged

@@ -8,4 +8,5 @@ select
     count(*)                                                           as observations,
     round(max(altitude_ft), 0)                                         as max_altitude_ft
 from {{ ref('stg_state_vectors') }}
+where is_plausible   -- BUG-009
 group by icao24

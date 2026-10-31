@@ -17,6 +17,9 @@ vars:
   # Vertical rate threshold separating climb/descent from level flight (m/s)
   level_flight_vr_ms: 2.5
   max_staleness_hours: 3
+  # BUG-009: a snapshot with more than this share of implausible rows means a
+  # systemic bug (swapped fields, wrong units), not a single transponder glitch.
+  max_glitch_share: 0.2
   # Must match the BBOX_* env vars used by the ingest DAG
   bbox_lamin: 47.27
   bbox_lomin: 5.87

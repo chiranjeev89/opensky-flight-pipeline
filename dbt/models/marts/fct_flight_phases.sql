@@ -5,6 +5,7 @@
 with obs as (
     select * from {{ ref('stg_state_vectors') }}
     where has_position
+      and is_plausible   -- BUG-009: glitch rows excluded, counted in fct_data_quality
 )
 
 select

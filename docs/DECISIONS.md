@@ -64,3 +64,13 @@ Revisit if: > ~20 concurrent tasks or tasks need separate machines.
 ## D-011: Synthetic data in CI instead of live API
 Why: CI must be deterministic, free and credential-free. Synthetic data goes through the real `parse_states` + `to_parquet_bytes`, so serializer bugs still fail CI. All synthetic callsigns start with `SIM`.
 Trade-off: CI cannot catch OpenSky changing its format → covered by dbt tests on live data in Airflow.
+
+## D-012: Flag and quarantine single glitches; block only systemic errors
+Date: 2026-10-31
+Context: Live data had 2 aircraft with impossible speed; the strict test blocked all publishing for 12+ hours (BUG-009).
+Options: 1) delete glitch rows silently  2) keep strict tests (any bad row blocks)  3) flag rows as implausible, exclude from marts, count them, fail only if a large share of a snapshot is bad
+Chosen: 3
+Why: Raw data stays complete (ELT), the dashboard stays fresh, glitches are visible as a daily metric, and real bugs (all rows wrong) still stop the publish.
+Trade-off: A genuine aircraft with an extreme value would be excluded; threshold `max_glitch_share` (20%) is a judgement call.
+Revisit if: implausible_rows grows above ~0.5% per day -> investigate the feed.
+
