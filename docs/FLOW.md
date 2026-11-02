@@ -43,3 +43,15 @@ browser :8501 → dashboard/app.py → duckdb.connect(serving.duckdb, read_only=
 ruff → pytest (HTTP mocked) → generate_sample_data.py (same serializer) → dbt build → measure_pipeline.py → job summary
 docker compose build → DagBag import check inside real Airflow image
 ```
+
+## Path 5: airport flights (daily at 06:15 UTC, FEATURE-004)
+```
+airflow/dags/airport_flights_daily.py :: fetch_and_land_day()
+ ├─ day = data_interval_end - 1 day                  (last complete UTC day; catchup fills missed days)
+ ├─ for airport in AIRPORTS (EDDF, EDDM), direction in (arrival, departure):
+ │    ├─ opensky_client.py :: fetch_airport_flights() -> _get('/flights/<direction>')   404 -> []
+ │    ├─ transform.py :: flights_to_parquet()         fixed FLIGHT_SCHEMA
+ │    └─ storage.py :: upload_snapshot(path=airport_flights_path())
+ └─ hourly flight_transform picks the files up: sync_lake -> ensure_bootstrap_files -> dbt build
+      stg_airport_flights -> fct_airport_hourly, fct_airport_daily, fct_routes (+ seed airports)
+```

@@ -1,4 +1,4 @@
-"""OpenSky Network REST client: OAuth2 client-credentials + /states/all.
+"""OpenSky Network REST client: OAuth2 client-credentials + /states/all + airport flights.
 
 Flow (docs/FLOW.md step 1):
     ingest task -> OpenSkyClient.fetch_states() -> TokenManager.get_token()
@@ -117,14 +117,42 @@ class OpenSkyClient:
         handle that (see transform.parse_states).
         """
         bbox = bbox or self._settings.bbox
-        url = f"{self._settings.opensky_api_url}/states/all"
+        return self._get("/states/all", bbox.as_params())
+
+    def fetch_airport_flights(self, airport: str, direction: str, begin: int, end: int) -> list[dict]:
+        """Arrivals or departures for one airport (ICAO code) between two unix times.
+
+        Endpoint: /flights/arrival or /flights/departure (FEATURE-004).
+        OpenSky builds this data in a nightly batch, so we only ask for
+        COMPLETED UTC days (D-013). The interval must be under 7 days.
+        HTTP 404 means "no flights found" and is returned as an empty list.
+        """
+        if direction not in ("arrival", "departure"):
+            raise ValueError(f"direction must be 'arrival' or 'departure', got {direction!r}")
+        if not 0 < end - begin < 7 * 86400:
+            raise ValueError("OpenSky allows 0 < end - begin < 7 days for airport flights")
+        data = self._get(
+            f"/flights/{direction}",
+            {"airport": airport, "begin": begin, "end": end},
+            not_found_ok=True,
+        )
+        return data or []
+
+    def _get(self, path: str, params: dict, not_found_ok: bool = False):
+        """GET with the shared failure policy (FAILURE.md F-01..F-03).
+
+        Used by every endpoint so retries, token refresh and credit tracking
+        behave identically. Returns parsed JSON, or None for 404 when
+        not_found_ok (OpenSky's way of saying "empty result").
+        """
+        url = f"{self._settings.opensky_api_url}{path}"
         refreshed = False
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 resp = self._session.get(
                     url,
-                    params=bbox.as_params(),
+                    params=params,
                     headers=self._headers(force_refresh=refreshed),
                     timeout=REQUEST_TIMEOUT_S,
                 )
@@ -137,10 +165,12 @@ class OpenSkyClient:
                 remaining = resp.headers.get("X-Rate-Limit-Remaining")
                 if remaining is not None:
                     self.last_credits_remaining = int(remaining)
-                    log.info("OpenSky credits remaining today: %s", remaining)
+                    log.info("OpenSky credits remaining today (%s): %s", path, remaining)
                 return resp.json()
+            if resp.status_code == 404 and not_found_ok:
+                return None
             if resp.status_code == 429:
-                raise CreditsExhausted("OpenSky daily credits exhausted (HTTP 429)")
+                raise CreditsExhausted(f"OpenSky daily credits exhausted for {path} (HTTP 429)")
             if resp.status_code == 401 and self._tokens is not None and not refreshed:
                 refreshed = True  # token may have expired early; refresh once
                 continue

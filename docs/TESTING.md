@@ -15,10 +15,14 @@ Real commands and what a pass looks like. Paste real output, never "tests pass".
 | 8 | Azurite check: `az storage blob list --connection-string "$AZURITE" -c flight-lake -o table` (or Azure Storage Explorer) | `raw/states/date=.../states_*.parquet` files |
 | 9 | After :05 past the hour → http://localhost:8501 | KPIs filled, "Data as of" < 1 h old |
 
+| 5c | **Upgrade without airport data**: remove `raw/airport_flights`, run `make dbt` | `PASS=58` (bootstrap file written by sync_lake; locally run `ensure_bootstrap_files` first) |
+| 10 | After 06:15 UTC → Airflow → `airport_flights_daily` | one green run per day since 30 Oct (catchup) |
+
 ## What the unit tests cover
 - Field mapping by name, lon/lat order (index 5 vs 6), null `states`, short rows, extra fields, all-null columns, empty Parquet.
 - Client: bearer header + bbox params, token caching, 429 no-retry, 5xx retry then success, 5xx give up, 401 refresh once, secret not leaked in errors.
 - Storage: deterministic partition paths, credit-tier guard on the bbox.
+- Airport flights (FEATURE-004): params sent, 404 = empty, 429 = credits exhausted, bad direction / >7-day interval rejected, 404 on /states still an error, fixed flight schema, empty day, deterministic path, bootstrap once / skipped when real files exist, AIRPORTS env parsing.
 
 ## Manual customer path (do before every release)
 Open dashboard → KPIs non-zero → chart has the last 24 h → map shows dots over Germany → pipeline health table shows today.
@@ -31,4 +35,13 @@ dbt build: Done. PASS=34 WARN=0 ERROR=0 SKIP=0 TOTAL=34 (33 before BUG-009)
 negative test: 1 FAIL (systemic), 18 SKIP (publish blocked)
 glitch test (2026-10-31): 2 implausible rows flagged, PASS=34
 dashboard AppTest: no exceptions; metrics rendered
+```
+
+## Verified run (2026-11-02, FEATURE-004)
+```
+pytest: 28 passed, 1 skipped
+dbt build: PASS=58 WARN=0 ERROR=0 SKIP=0 TOTAL=58
+airport DAG vs Azurite + fake OpenSky: success, day 2026-11-01, 4 files landed (EDDM arrival 404 -> 0 rows)
+upgrade without airport files: without bootstrap ERROR=1 SKIP=18 -> with bootstrap PASS=58
+dashboard AppTest: no exceptions (also on an old DB without airport tables)
 ```

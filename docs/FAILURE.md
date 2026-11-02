@@ -15,6 +15,9 @@ Dependency by dependency: slow, down, wrong, empty. Plus the first limits.
 | F-09 | **Stale data** (> 3 h) | `assert_data_is_fresh` **warns** | Warning in dbt log; dashboard "Data as of" | Check ingest DAG |
 | F-10 | **Disk full on lake volume** | Sync/dbt fail | Failed task | Prune old partitions (Blob keeps the original) |
 
+| F-11 | **Airport batch late / empty** (OpenSky nightly job) | 404 → empty day; low counts are kept as-is | `fct_airport_daily` shows an unusually low day; freshness warning after 3 days | Re-run that day's DAG run (Clear) → file is overwritten |
+| F-12 | **No airport file yet** (fresh install/upgrade) | 0-row bootstrap file keeps dbt green (D-014) | Dashboard: "No airport data yet" | Automatic at next 06:15 UTC run |
+
 ## First limits I expect to hit
 1. **Sync time**: `list_blobs` walks every file. At 144 files/day → ~52k files/year; listing gets slow after a few months. Fix: sync only last N date partitions.
 2. **dbt full rebuild**: staging is a view over *all* Parquet → each run rescans everything. Fix: incremental mart models (by snapshot_hour).

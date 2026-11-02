@@ -85,6 +85,14 @@ class Settings:
         )
     )
 
+    # FEATURE-004: airports for arrivals/departures (ICAO codes). Frankfurt + Munich
+    # = Germany's two hubs. 2 airports x 2 directions = 4 API calls per day.
+    airports: tuple[str, ...] = field(
+        default_factory=lambda: tuple(
+            a.strip().upper() for a in _env("AIRPORTS", "EDDF,EDDM").split(",") if a.strip()
+        )
+    )
+
     @property
     def has_opensky_credentials(self) -> bool:
         return bool(self.opensky_client_id and self.opensky_client_secret)

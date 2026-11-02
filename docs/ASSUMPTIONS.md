@@ -15,6 +15,10 @@ Status: ✅ verified · ❓ unverified · ❌ wrong. Clear every ❓ before call
 | A-10 | 2.5 m/s vertical-rate threshold separates climb/descent well | ❓ | Spot-check 20 aircraft against a flight tracker |
 | A-11 | Synthetic numbers in README will be replaced | ❓ | README Results says "live" + date |
 
+| A-12 | `/flights/*` calls cost few credits from their own bucket; 4 calls/day are negligible | ✅ | 2026-11-02 live logs: ~30 credits per call, 120 per day (3880 → 3760 → 3640 over 3 catch-up days), separate 4,000/day bucket |
+| A-13 | OpenSky's nightly batch is done by 06:15 UTC | ✅ (partly) | 2026-11-02 08:09 UTC: 1 Nov had FRA 577 arr / 506 dep, MUC 429 / 389. Re-check a run that fires exactly at 06:15 |
+| A-14 | Unknown origin/destination share in real data is moderate (< 20%) | ✅ | 2026-11-02 dashboard: FRA 16.2% of arrivals with unknown origin on 1 Nov |
+
 Open questions
 - Q-01 Should missed snapshots during an outage be backfilled using `time=` (authenticated, ≤1 h back)? Currently no.
 - Q-02 Move to real Azure (free student credits) or keep Azurite? Real Azure is a stronger CV line.

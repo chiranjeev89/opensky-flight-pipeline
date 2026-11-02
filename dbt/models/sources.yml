@@ -14,3 +14,10 @@ sources:
         description: One row per ingest run with latency, row count and credits remaining.
         meta:
           external_location: "read_parquet('{{ env_var('LOCAL_LAKE_DIR', '../data/lake') }}/raw/runs/**/*.parquet', hive_partitioning = true, union_by_name = true)"
+      - name: raw_airport_flights
+        description: >
+          One row per flight per airport query (FEATURE-004): yesterday's arrivals and
+          departures for each airport in AIRPORTS, from /flights/arrival and /flights/departure.
+          A flight between two collected airports appears twice (once per query).
+        meta:
+          external_location: "read_parquet('{{ env_var('LOCAL_LAKE_DIR', '../data/lake') }}/raw/airport_flights/**/*.parquet', hive_partitioning = true, union_by_name = true)"

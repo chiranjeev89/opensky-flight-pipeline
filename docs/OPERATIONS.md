@@ -9,7 +9,7 @@ How to run, pause, resume and find the data.
    - Dashboard: http://localhost:8501
 
 After the first build, a restart takes 1-3 minutes. From then on the pipeline runs by itself:
-ingest every 10 minutes, transform at :05 past every hour.
+ingest every 10 minutes, transform at :05 past every hour, airport arrivals/departures once a day at 06:15 UTC (07:15 German winter time). If the laptop was off at 06:15, the missed days are fetched automatically on the next start (catchup).
 
 ## Pause / stop
 - Double-click **stop.bat** (runs `docker compose down`). All data is kept.
@@ -49,3 +49,7 @@ python scripts/measure_pipeline.py --db data/lake/serving.duckdb
 | A container won't start | `docker compose logs <service> --tail 80` |
 | Runs stay "queued" | DAG paused? Toggle it on in the Airflow UI (BUG-006) |
 | `CreditsExhausted` / runs skipped | daily OpenSky credits used up; add API client keys to `.env` |
+
+## After changing code in src/
+DAG and dbt files are read live, but `src/flightpipe` is built into the Airflow image. After any change in `src/`, run **start.bat** (it rebuilds) or the DAGs will import the old code (seen 2026-11-02: one ImportError, fixed by the rebuild + retry).
+

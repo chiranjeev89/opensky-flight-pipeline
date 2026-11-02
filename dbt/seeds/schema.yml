@@ -1,0 +1,12 @@
+version: 2
+
+seeds:
+  - name: airports
+    description: >
+      Small reference list (ICAO -> IATA, name, city, country) for readable route labels.
+      Airports not in the list are shown by their ICAO code.
+    columns:
+      - name: icao
+        data_tests: [not_null, unique]
+      - name: iata
+        data_tests: [not_null, unique]

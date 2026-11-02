@@ -4,6 +4,7 @@ config-version: 2
 profile: flight_ops
 
 model-paths: ["models"]
+seed-paths: ["seeds"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
 target-path: "target"
@@ -20,6 +21,11 @@ vars:
   # BUG-009: a snapshot with more than this share of implausible rows means a
   # systemic bug (swapped fields, wrong units), not a single transponder glitch.
   max_glitch_share: 0.2
+  # FEATURE-004: airports whose arrivals/departures are collected (keep in sync with AIRPORTS env var)
+  airports: ['EDDF', 'EDDM']
+  max_airport_data_age_days: 3
+  # Longest plausible flight; anything longer is a tracking error
+  max_flight_duration_min: 1200
   # Must match the BBOX_* env vars used by the ingest DAG
   bbox_lamin: 47.27
   bbox_lomin: 5.87
@@ -32,3 +38,10 @@ models:
       +materialized: view
     marts:
       +materialized: table
+
+seeds:
+  flight_ops:
+    airports:
+      +column_types:
+        icao: varchar
+        iata: varchar

@@ -89,3 +89,53 @@ def test_token_failure_does_not_leak_secret():
     with pytest.raises(OpenSkyError) as e:
         OpenSkyClient(settings()).fetch_states()
     assert "secret" not in str(e.value)
+
+
+# ---- FEATURE-004: airport flights -------------------------------------------
+
+FLIGHT = {
+    "icao24": "3c6444",
+    "firstSeen": 1761890000,
+    "estDepartureAirport": "EDDF",
+    "lastSeen": 1761893600,
+    "estArrivalAirport": "EGLL",
+    "callsign": "DLH900  ",
+}
+
+
+@responses.activate
+def test_airport_flights_returns_list_and_sends_params():
+    responses.get(f"{API}/flights/departure", json=[FLIGHT])
+    out = OpenSkyClient(settings(auth=False)).fetch_airport_flights("EDDF", "departure", 100, 86499)
+    assert out == [FLIGHT]
+    url = responses.calls[0].request.url
+    assert "airport=EDDF" in url and "begin=100" in url and "end=86499" in url
+
+
+@responses.activate
+def test_airport_flights_404_means_no_flights():
+    responses.get(f"{API}/flights/arrival", status=404)
+    assert OpenSkyClient(settings(auth=False)).fetch_airport_flights("EDDM", "arrival", 0, 86399) == []
+
+
+@responses.activate
+def test_airport_flights_429_raises_credits_exhausted():
+    responses.get(f"{API}/flights/arrival", status=429)
+    with pytest.raises(CreditsExhausted):
+        OpenSkyClient(settings(auth=False)).fetch_airport_flights("EDDM", "arrival", 0, 86399)
+
+
+def test_airport_flights_rejects_bad_direction_and_long_interval():
+    c = OpenSkyClient(settings(auth=False))
+    with pytest.raises(ValueError):
+        c.fetch_airport_flights("EDDF", "landing", 0, 100)
+    with pytest.raises(ValueError):
+        c.fetch_airport_flights("EDDF", "arrival", 0, 8 * 86400)  # OpenSky limit is < 7 days
+
+
+@responses.activate
+def test_states_404_is_still_an_error():
+    # 404 is only "empty" for airport flights; for /states/all it means a broken URL.
+    responses.get(f"{API}/states/all", status=404)
+    with pytest.raises(OpenSkyError):
+        OpenSkyClient(settings(auth=False)).fetch_states()

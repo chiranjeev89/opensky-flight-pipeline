@@ -67,6 +67,18 @@ def main() -> None:
     print(f"| Rows missing position | {dq[0]}% |")
     print(f"| Rows missing callsign | {dq[1]}% |")
     print(f"| Duplicate rows removed by staging | {dq[2]:,} |")
+    # FEATURE-004: airport numbers (skipped on databases built before the airport models)
+    try:
+        for ap, days_, avg_mov, peak in con.execute(
+            """select airport, count(*), round(avg(movements)), max(movements)
+               from fct_airport_daily group by 1 order by 1"""
+        ).fetchall():
+            print(f"| {ap} movements per day (avg / max, {days_} days) | {avg_mov:,.0f} / {peak:,} |")
+        top = con.execute("select route, flights from fct_routes order by flights desc limit 3").fetchall()
+        if top:
+            print("| Busiest routes | " + ", ".join(f"{r} ({n})" for r, n in top) + " |")
+    except duckdb.CatalogException:
+        pass
     print("| Flight phase mix | " + ", ".join(f"{p} {v}%" for p, v in phases) + " |")
 
 

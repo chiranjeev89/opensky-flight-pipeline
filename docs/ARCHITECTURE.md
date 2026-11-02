@@ -29,7 +29,7 @@ One page. The shape of the system, not the implementation. Deeper detail: [FLOW.
 | `src/flightpipe/opensky_client.py` | OAuth2 token, HTTP calls, retries | – | OpenSky API |
 | `src/flightpipe/transform.py` | Positional array → named, typed Parquet | bytes in memory | raw JSON |
 | `src/flightpipe/storage.py` | Blob layout, upload, sync to cache | Blob, /opt/lake/raw | Blob |
-| `airflow/dags/*` | Schedule, ordering, retries (no logic) | – | – |
+| `airflow/dags/*` | Schedule, ordering, retries (no logic): 10-min ingest, hourly transform, daily airport flights | – | – |
 | `dbt/` | Cleaning, business logic, data tests | warehouse.duckdb | /opt/lake/raw |
 | `dashboard/app.py` | Presentation only | nothing | serving.duckdb (read-only mount) |
 
@@ -39,3 +39,5 @@ One page. The shape of the system, not the implementation. Deeper detail: [FLOW.
 3. Dashboard → data: read-only volume mount, read-only DuckDB connection, no credentials in that container.
 
 **Bronze / Silver / Gold**: raw Parquet in Blob (bronze) → `stg_*` views (silver) → `fct_*`/`dim_*` tables (gold).
+
+**FEATURE-004 (2026-11-02):** a third DAG, `airport_flights_daily`, lands yesterday's arrivals/departures for FRA and MUC in `raw/airport_flights/`. Same trust boundary (OpenSky), same storage, same dbt gate; see the README diagram.

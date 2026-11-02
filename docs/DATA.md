@@ -39,3 +39,21 @@ Exists so "measure" numbers come from data, not from reading Airflow logs.
 | unknown | no altitude |
 
 Trade-off: snapshot-based, not trajectory-based: a single noisy vertical-rate reading can misclassify one point. See "what I'd improve" in README.
+
+## 5. Airport flights (FEATURE-004)
+- **Source**: `/flights/arrival` and `/flights/departure` per airport and UTC day (JSON objects, named fields).
+- **Stored**: `raw/airport_flights/date=YYYY-MM-DD/<AIRPORT>_<direction>.parquet`, fixed `FLIGHT_SCHEMA` (16 columns: query_airport, direction, flight_date, ingested_at, icao24, first_seen, est_departure_airport, last_seen, est_arrival_airport, callsign, 4 distance columns, 2 candidate counts).
+- **Size**: ~400-700 flights per airport per direction per day → ~2,000-3,000 rows/day for FRA+MUC, tens of KB.
+- **Writer**: only `airport_flights_daily`. Re-running a day overwrites its 4 files (idempotent).
+
+| Model | Grain | Key test |
+|---|---|---|
+| stg_airport_flights | airport × direction × flight | unique (airport, direction, icao24, departure_ts) |
+| fct_airport_hourly | airport × UTC hour | unique (airport, movement_hour); hours add up to the day |
+| fct_airport_daily | airport × day | unique (airport, flight_date); movements = arrivals + departures |
+| fct_routes | departure × arrival airport | unique route; each physical flight counted once |
+| airports (seed) | ICAO code | unique icao, unique iata |
+
+- **Why count a flight once in routes**: a FRA→MUC flight is in FRA departures AND MUC arrivals. `(icao24, departure_ts)` identifies the physical flight.
+- **Local time**: airport profiles use `Europe/Berlin` (people think of FRA's morning peak at 07:00 local), while all stored timestamps stay UTC.
+- **Duration caveat**: `duration_min` = lastSeen − firstSeen, i.e. the time receivers saw the aircraft, not block time (FRA→MUC median 33 min live vs ~55 min scheduled). Fine for ranking routes, not for punctuality.

@@ -21,10 +21,11 @@ st.set_page_config(page_title="Flight Ops over Germany", layout="wide")
 
 
 @st.cache_data(ttl=300)  # 5 min cache: data only changes hourly, protects the DB from refresh spam
-def query(sql: str) -> pd.DataFrame:
+def query(sql: str, params: tuple = ()) -> pd.DataFrame:
+    # Values always go in as bound parameters (?), never pasted into the SQL text (THREAT T-04).
     with duckdb.connect(DB_PATH, read_only=True) as con:
         con.execute("SET TimeZone = 'UTC'")  # BUG-004: show UTC whatever the host timezone is
-        return con.execute(sql).df()
+        return con.execute(sql, list(params)).df()
 
 
 st.title("✈️ Flight Operations over Germany")
@@ -73,6 +74,73 @@ latest = query(
        where snapshot_ts = (select max(snapshot_ts) from fct_flight_phases)"""
 )
 st.map(latest, size=800)
+
+# ---------------------------------------------------------------------------
+# FEATURE-004: Frankfurt & Munich - flights per airport per hour, busiest routes
+# ---------------------------------------------------------------------------
+AIRPORT_NAMES = {"EDDF": "Frankfurt (FRA)", "EDDM": "Munich (MUC)"}
+
+st.header("Airports: Frankfurt & Munich")
+try:
+    daily = query("select * from fct_airport_daily order by airport, flight_date")
+except duckdb.CatalogException:
+    daily = pd.DataFrame()  # serving DB published before the airport models existed
+
+if daily.empty:
+    st.info(
+        "No airport data yet. The airport_flights_daily DAG fetches yesterday's arrivals and "
+        "departures every morning at 06:15 UTC (OpenSky publishes them in a nightly batch)."
+    )
+else:
+    airports = [a for a in AIRPORT_NAMES if a in set(daily["airport"])] or sorted(set(daily["airport"]))
+    choice = st.radio(
+        "Airport", airports, format_func=lambda a: AIRPORT_NAMES.get(a, a), horizontal=True, key="airport"
+    )
+    d = daily[daily["airport"] == choice]
+    last = d.iloc[-1]
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric(f"Movements on {last['flight_date']:%d %b}", f"{int(last['movements']):,}")
+    k2.metric("Arrivals / departures", f"{int(last['arrivals'])} / {int(last['departures'])}")
+    k3.metric("Avg movements per day", f"{d['movements'].mean():,.0f}")
+    k4.metric("Unknown origin (arrivals)", f"{last['pct_unknown_origin']:.1f}%")
+
+    a1, a2 = st.columns(2)
+    with a1:
+        st.subheader("Typical day: movements by local hour")
+        prof = query(
+            """select hour_of_day_local as hour,
+                       round(avg(arrivals), 1) as arrivals, round(avg(departures), 1) as departures
+                from fct_airport_hourly where airport = ?
+                group by 1 order by 1""",
+            (choice,),
+        )
+        st.bar_chart(prof.set_index("hour"), stack=False)
+        st.caption("Average over all collected days. Hours in Europe/Berlin time.")
+    with a2:
+        st.subheader("Busiest routes")
+        routes = query(
+            """select route, route_cities as cities, flights, median_duration_min as median_min
+                from fct_routes
+                where departure_airport = ? or arrival_airport = ?
+                order by flights desc limit 15""",
+            (choice, choice),
+        )
+        st.dataframe(routes, width="stretch", hide_index=True)
+        st.caption("median_min = time OpenSky's receivers saw the flight, not gate-to-gate block time.")
+
+    st.subheader("Movements per day")
+    per_day = daily.assign(day=daily["flight_date"].astype(str))  # text labels -> full-width bars
+    st.bar_chart(per_day.pivot(index="day", columns="airport", values="movements"), stack=False)
+
+st.subheader("Data freshness")
+fresh = [
+    {"dataset": "Live positions (every 10 min)", "newest": f"{pd.Timestamp(newest):%Y-%m-%d %H:%M} UTC"},
+    {
+        "dataset": "Airport arrivals/departures (daily)",
+        "newest": f"{daily['flight_date'].max():%Y-%m-%d} (full day)" if not daily.empty else "none yet",
+    },
+]
+st.dataframe(pd.DataFrame(fresh), width="stretch", hide_index=True)
 
 st.subheader("Pipeline health (the 'measure' numbers)")
 st.dataframe(health, width="stretch", hide_index=True)

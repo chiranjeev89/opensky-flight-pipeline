@@ -20,8 +20,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from flightpipe.storage import blob_path_for, run_meta_path_for  # noqa: E402
-from flightpipe.transform import parse_states, run_meta_to_parquet, to_parquet_bytes  # noqa: E402
+from flightpipe.storage import airport_flights_path, blob_path_for, run_meta_path_for  # noqa: E402
+from flightpipe.transform import (  # noqa: E402
+    flights_to_parquet,
+    parse_states,
+    run_meta_to_parquet,
+    to_parquet_bytes,
+)
 
 COUNTRIES = ["Germany", "United Kingdom", "France", "Netherlands", "Ireland", "Poland", "Switzerland"]
 
@@ -75,6 +80,82 @@ def snapshot(fleet: list[dict], t: int, rng: random.Random, hour: int) -> dict:
     return {"time": t, "states": states}
 
 
+# (destination ICAO, typical block minutes, weight) from Frankfurt/Munich - synthetic only
+DESTINATIONS = [
+    ("EGLL", 85, 10),
+    ("LFPG", 70, 9),
+    ("EHAM", 60, 7),
+    ("LEMD", 150, 6),
+    ("LIRF", 115, 6),
+    ("LSZH", 50, 5),
+    ("LOWW", 70, 5),
+    ("EDDH", 60, 7),
+    ("EDDB", 60, 7),
+    ("EKCH", 80, 4),
+    ("LEPA", 130, 5),
+    ("LTFM", 170, 4),
+    ("OMDB", 380, 3),
+    ("KJFK", 520, 3),
+    ("VIDP", 450, 2),
+]
+# Departure-bank shape (local hour -> relative weight): morning, midday, evening peaks
+BANKS = {
+    6: 6,
+    7: 9,
+    8: 8,
+    9: 6,
+    10: 5,
+    11: 6,
+    12: 7,
+    13: 6,
+    14: 5,
+    15: 5,
+    16: 6,
+    17: 8,
+    18: 9,
+    19: 7,
+    20: 5,
+    21: 3,
+    22: 1,
+}
+
+
+def airport_day(hub: str, other_hub: str, day, rng: random.Random) -> dict[str, list[dict]]:
+    """Synthetic arrivals/departures for one hub and one UTC day (FEATURE-004 CI data)."""
+    base = int(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp())
+    deps, arrs = [], []
+    n = 520 if hub == "EDDF" else 380  # FRA is the larger hub
+    hours = list(BANKS)
+    for i in range(n):
+        h = rng.choices(hours, weights=list(BANKS.values()))[0] - 1  # local CET -> UTC
+        t = base + h * 3600 + rng.randint(0, 3599)
+        dest, block, _ = rng.choices(
+            DESTINATIONS + [(other_hub, 55, 0)], weights=[d[2] for d in DESTINATIONS] + [6]
+        )[0]
+        dur = int(block * 60 * rng.uniform(0.9, 1.15))
+        icao = f"{rng.randrange(0x300000, 0x4FFFFF):06x}"
+        f = {
+            "icao24": icao,
+            "callsign": f"SIM{i:04d}  ",
+            "firstSeen": t,
+            "lastSeen": t + dur,
+            "estDepartureAirport": hub,
+            "estArrivalAirport": None if rng.random() < 0.06 else dest,  # ~6% unknown, like real data
+        }
+        deps.append(f)
+        # Arrivals at the hub: mirror flights coming back from a destination
+        a = dict(
+            f,
+            icao24=f"{rng.randrange(0x300000, 0x4FFFFF):06x}",
+            estDepartureAirport=None if rng.random() < 0.08 else dest,
+            estArrivalAirport=hub,
+            firstSeen=t - dur,
+            lastSeen=t,
+        )
+        arrs.append(a)
+    return {"departure": deps, "arrival": arrs}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="data/lake")
@@ -114,6 +195,23 @@ def main() -> None:
         files += 1
         t += timedelta(minutes=10)
     print(f"Wrote {files} synthetic snapshots to {out}")
+
+    # FEATURE-004: complete UTC days only, like the real daily DAG.
+    days = 0
+    d = start.date()
+    while d < end.date():
+        fra = airport_day("EDDF", "EDDM", d, rng)
+        muc = airport_day("EDDM", "EDDF", d, rng)
+        # A FRA->MUC flight must also be a MUC arrival (same icao24 + times): tests dedupe in fct_routes
+        muc["arrival"] += [f for f in fra["departure"] if f["estArrivalAirport"] == "EDDM"]
+        for hub, data in (("EDDF", fra), ("EDDM", muc)):
+            for direction, flights in data.items():
+                p = out / airport_flights_path(hub, direction, d)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(flights_to_parquet(flights, hub, direction, d, ingested_at=end))
+        days += 1
+        d += timedelta(days=1)
+    print(f"Wrote {days} synthetic airport days (EDDF, EDDM) to {out}")
 
 
 if __name__ == "__main__":

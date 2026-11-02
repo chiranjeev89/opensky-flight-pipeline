@@ -24,3 +24,40 @@ def test_empty_env_value_falls_back_to_default(monkeypatch):
 
     monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "")
     assert get_settings().azure_conn_str == AZURITE_CONN_STR
+
+
+def test_airport_flights_path_is_deterministic():
+    from datetime import date
+
+    from flightpipe.storage import airport_flights_path
+
+    assert (
+        airport_flights_path("EDDF", "arrival", date(2026, 11, 1))
+        == "raw/airport_flights/date=2026-11-01/EDDF_arrival.parquet"
+    )
+
+
+def test_bootstrap_written_once_and_only_when_needed(tmp_path):
+    from flightpipe.storage import ensure_bootstrap_files
+
+    first = ensure_bootstrap_files(str(tmp_path))
+    assert len(first) == 1 and first[0].endswith("_bootstrap.parquet")
+    assert ensure_bootstrap_files(str(tmp_path)) == []  # idempotent
+
+
+def test_bootstrap_skipped_when_real_files_exist(tmp_path):
+    from flightpipe.storage import ensure_bootstrap_files
+
+    real = tmp_path / "raw/airport_flights/date=2026-11-01/EDDF_arrival.parquet"
+    real.parent.mkdir(parents=True)
+    real.write_bytes(b"x")
+    assert ensure_bootstrap_files(str(tmp_path)) == []
+
+
+def test_default_airports_are_frankfurt_and_munich(monkeypatch):
+    from flightpipe.config import get_settings
+
+    monkeypatch.delenv("AIRPORTS", raising=False)
+    assert get_settings().airports == ("EDDF", "EDDM")
+    monkeypatch.setenv("AIRPORTS", " eddf, eddm ,edds")
+    assert get_settings().airports == ("EDDF", "EDDM", "EDDS")

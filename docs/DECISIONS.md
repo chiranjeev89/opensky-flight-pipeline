@@ -74,3 +74,18 @@ Why: Raw data stays complete (ELT), the dashboard stays fresh, glitches are visi
 Trade-off: A genuine aircraft with an extreme value would be excluded; threshold `max_glitch_share` (20%) is a judgement call.
 Revisit if: implausible_rows grows above ~0.5% per day -> investigate the feed.
 
+## D-013: Airport data from /flights/arrival|departure, daily, for completed days, with catchup
+Date: 2026-11-02
+Context: The brief asks for flights per airport per hour and busiest routes. State snapshots cannot tell origin/destination.
+Options: 1) infer take-offs/landings from 10-min snapshots near FRA/MUC  2) /flights/arrival|departure per airport  3) /flights/all for every flight
+Chosen: 2
+Why: OpenSky already estimates departure/arrival airports from full tracks; 4 calls/day; data for past days can be fetched later, so catchup fills gaps. Option 1 misses most movements with 10-minute snapshots; option 3 is far more data than needed.
+Trade-off: Up to a day of delay (nightly batch); airports are estimates (some unknown); counts are flights OpenSky's receivers saw, not official airport statistics.
+Revisit if: near-real-time airport counts are needed -> 1-minute polling of a small box around the airport (1 credit) and landing detection.
+
+## D-014: Bootstrap empty Parquet for datasets that arrive later
+Date: 2026-11-02
+Context: dbt sources read `<dir>/**/*.parquet`; DuckDB errors when no file matches. After the upgrade, the hourly transform would fail until the first daily airport run (tested: ERROR + 18 SKIP).
+Options: 1) accept a failing transform until 06:15  2) make the transform depend on the airport DAG  3) write a 0-row file with the real schema in the local cache
+Chosen: 3
+Why: Zero effect on results, keeps hourly publishing independent of the daily job, local-only (never uploaded).

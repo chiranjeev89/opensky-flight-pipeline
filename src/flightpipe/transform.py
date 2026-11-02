@@ -122,3 +122,80 @@ def run_meta_to_parquet(meta: dict) -> bytes:
     buf = io.BytesIO()
     pq.write_table(table, buf, compression="snappy")
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# FEATURE-004: airport arrivals/departures (/flights/arrival, /flights/departure)
+# Unlike /states/all these are JSON objects with names, so no index mapping is
+# needed. We still force a fixed schema (same reason as ARROW_SCHEMA) and add
+# which query produced the row: the same flight can appear in FRA departures
+# AND MUC arrivals; dbt dedupes it for route counts.
+# ---------------------------------------------------------------------------
+
+FLIGHT_FIELDS = [
+    "icao24",
+    "firstSeen",
+    "estDepartureAirport",
+    "lastSeen",
+    "estArrivalAirport",
+    "callsign",
+    "estDepartureAirportHorizDistance",
+    "estDepartureAirportVertDistance",
+    "estArrivalAirportHorizDistance",
+    "estArrivalAirportVertDistance",
+    "departureAirportCandidatesCount",
+    "arrivalAirportCandidatesCount",
+]
+
+FLIGHT_SCHEMA = pa.schema(
+    [
+        ("query_airport", pa.string()),
+        ("direction", pa.string()),
+        ("flight_date", pa.date32()),
+        ("ingested_at", pa.timestamp("us", tz="UTC")),
+        ("icao24", pa.string()),
+        ("first_seen", pa.int64()),
+        ("est_departure_airport", pa.string()),
+        ("last_seen", pa.int64()),
+        ("est_arrival_airport", pa.string()),
+        ("callsign", pa.string()),
+        ("dep_horiz_distance_m", pa.int64()),
+        ("dep_vert_distance_m", pa.int64()),
+        ("arr_horiz_distance_m", pa.int64()),
+        ("arr_vert_distance_m", pa.int64()),
+        ("dep_candidates", pa.int64()),
+        ("arr_candidates", pa.int64()),
+    ]
+)
+
+_FLIGHT_RENAME = dict(zip(FLIGHT_FIELDS, FLIGHT_SCHEMA.names[4:], strict=True))
+
+
+def flights_to_parquet(
+    flights: list[dict],
+    query_airport: str,
+    direction: str,
+    flight_date,
+    ingested_at: datetime | None = None,
+) -> bytes:
+    """Serialize one airport/direction/day of flights with FLIGHT_SCHEMA.
+
+    Unknown extra keys are ignored; missing keys become null. Raw values are
+    kept as sent (ELT, D-004); cleaning happens in stg_airport_flights.
+    """
+    ingested_at = ingested_at or datetime.now(UTC)
+    rows = []
+    for f in flights:
+        rec = {new: f.get(old) for old, new in _FLIGHT_RENAME.items()}
+        rec.update(
+            query_airport=query_airport,
+            direction=direction,
+            flight_date=flight_date,
+            ingested_at=ingested_at,
+        )
+        rows.append(rec)
+    columns = {name: [r.get(name) for r in rows] for name in FLIGHT_SCHEMA.names}
+    table = pa.Table.from_pydict(columns, schema=FLIGHT_SCHEMA)
+    buf = io.BytesIO()
+    pq.write_table(table, buf, compression="snappy")
+    return buf.getvalue()

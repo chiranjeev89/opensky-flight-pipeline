@@ -1,4 +1,4 @@
-"""DAG 2/2: flight_transform - hourly: sync Blob -> run dbt build -> publish.
+"""DAG 2/3: flight_transform - hourly: sync Blob -> run dbt build -> publish.
 
 Flow (docs/FLOW.md steps 3-5):
     sync_lake      download new Parquet from Blob to the shared /opt/lake volume
@@ -39,10 +39,13 @@ def flight_transform():
     @task
     def sync_lake() -> int:
         from flightpipe.config import get_settings
-        from flightpipe.storage import get_container, sync_to_local
+        from flightpipe.storage import ensure_bootstrap_files, get_container, sync_to_local
 
         s = get_settings()
-        return sync_to_local(get_container(s.azure_conn_str, s.azure_container), s.local_lake_dir)
+        n = sync_to_local(get_container(s.azure_conn_str, s.azure_container), s.local_lake_dir)
+        # FEATURE-004: datasets that arrive daily need a 0-row stand-in until their first file
+        ensure_bootstrap_files(s.local_lake_dir)
+        return n
 
     dbt_build = BashOperator(
         task_id="dbt_build",

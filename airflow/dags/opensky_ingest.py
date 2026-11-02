@@ -1,4 +1,4 @@
-"""DAG 1/2: opensky_ingest - pull one snapshot every 10 minutes into Azure Blob.
+"""DAG 1/3: opensky_ingest - pull one snapshot every 10 minutes into Azure Blob.
 
 Flow (docs/FLOW.md): fetch /states/all -> parse -> Parquet -> upload to
 raw/states/... and a run-metrics row to raw/runs/...

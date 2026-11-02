@@ -11,7 +11,7 @@
 
 ## 1. Problem
 
-Air traffic data is public: every airliner broadcasts its position over ADS-B. Raw, though, it is hard to use. It arrives as an unlabelled array of 17 numbers per aircraft, with missing positions, padded callsigns and SI units. It changes every few seconds, and the API has a daily credit budget.
+Airports and airlines need reliable, up-to-date traffic data. Air traffic data is public: every airliner broadcasts its position over ADS-B. Raw, though, it is hard to use. It arrives as an unlabelled array of 17 numbers per aircraft, with missing positions, padded callsigns and SI units. It changes every few seconds, and the API has a daily credit budget.
 
 I worked 2+ years on predictive modelling of aircraft systems, and models like that need data that is **reliable, tested and on time**. So this project answers an engineering question rather than an analysis one:
 
@@ -19,6 +19,7 @@ I worked 2+ years on predictive modelling of aircraft systems, and models like t
 
 The questions the data then answers:
 - How many aircraft are over Germany each hour, and when is the peak?
+- **How many flights use Frankfurt (FRA) and Munich (MUC) each hour and day, and what are their busiest routes?**
 - What share of observations are climb, cruise, descent or on the ground?
 - Which registration countries fly over Germany?
 - **How healthy is the pipeline itself?** (completeness, latency, data quality)
@@ -36,10 +37,11 @@ flowchart LR
         subgraph AF["Airflow 3 · LocalExecutor"]
             I["DAG: opensky_ingest<br/>every 10 min"]
             T["DAG: flight_transform<br/>hourly :05"]
+            A["DAG: airport_flights_daily<br/>06:15 UTC · FRA + MUC"]
         end
-        BLOB[("Azure Blob Storage<br/>(Azurite locally)<br/>raw/states/date=/hour=/*.parquet<br/>raw/runs/*.parquet")]
+        BLOB[("Azure Blob Storage<br/>(Azurite locally)<br/>raw/states/date=/hour=/*.parquet<br/>raw/runs/*.parquet<br/>raw/airport_flights/*.parquet")]
         LAKE[("/opt/lake<br/>local cache")]
-        DBT["dbt build<br/>2 staging · 6 marts<br/>25 data tests"]
+        DBT["dbt build<br/>3 staging · 9 marts · 1 seed<br/>45 data tests"]
         WH[("warehouse.duckdb")]
         SV[("serving.duckdb<br/>published only<br/>if tests pass")]
         DASH["Streamlit dashboard<br/>:8501 · read-only"]
@@ -53,6 +55,8 @@ flowchart LR
 
     OS -- "GET /states/all<br/>Germany bbox" --> I
     I -- "Parquet (fixed schema)<br/>idempotent overwrite" --> BLOB
+    OS -- "GET /flights/arrival|departure<br/>yesterday" --> A
+    A -- "Parquet per airport/day" --> BLOB
     T -- "sync_lake" --> BLOB
     BLOB --> LAKE --> DBT --> WH
     WH -- "atomic copy<br/>(publish)" --> SV --> DASH
@@ -82,8 +86,10 @@ The pipeline measures itself. Every ingest run writes a metrics row (`raw/runs/`
 | **Rows / storage per day** | `fct_pipeline_health` | state vectors and MB of Parquet |
 | **% missing position / callsign** | `fct_data_quality` | quality of the raw feed |
 | **Duplicates removed** | `fct_data_quality` | raw rows − cleaned rows |
-| **Data tests passed** | `dbt build` | 25 data tests (20 generic + 5 singular) on every hourly run |
-| **Credit budget** | design | 144 runs × 2 credits = **288/day = 7% of quota** |
+| **Data tests passed** | `dbt build` | 45 data tests (35 generic + 10 singular) on every hourly run |
+| **Airport movements per day** | `fct_airport_daily` | arrivals + departures at FRA and MUC, with % unknown origin/destination |
+| **Airport data freshness** | `assert_airport_data_is_fresh` | newest complete airport day ≤ 3 days old (warning) |
+| **Credit budget** | design | `/states`: 144 runs × 2 credits = **288/day = 7% of quota**; `/flights`: 4 calls/day (separate bucket) |
 
 Reproduce every number with one command: `make measure` (runs [scripts/measure_pipeline.py](scripts/measure_pipeline.py)).
 
@@ -102,10 +108,12 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 | Unique aircraft seen | 400 |
 | Peak airborne aircraft in one hour | 275 |
 | Rows missing position | 2.09% |
-| dbt build | **33 / 33 PASS** (8 models, 25 tests) in 5.6 s |
-| Unit tests | 16 passed (+1 DAG import test run in CI Docker job) |
+| dbt build | **58 / 58 PASS** (12 models, 1 seed, 45 tests) |
+| Unit tests | 28 passed (+1 DAG import test run in CI Docker job) |
 | **Negative test**: injected impossible snapshot (98,000 ft, 900 m/s, lat/lon swapped) | **systemic-glitch test FAILS → 18 downstream nodes SKIPPED → nothing published** ✅ |
 | **Real-world glitch handling** (found in live data, BUG-009) | 2 transponder glitches (> 750 kt) flagged and excluded, counted in `implausible_rows`, publish continues ✅ |
+
+**Airports (synthetic verification, 3 days):** FRA ≈ 1,040 and MUC ≈ 790 movements/day; busiest routes LHR→FRA, FRA→LHR, MUC→FRA. A FRA→MUC flight appears in both airports' feeds and is counted **once** in `fct_routes` (tested). Live numbers replace these after the collection week.
 
 ## 5. Why it works
 
@@ -115,6 +123,7 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 4. **It fails loudly, not silently.** A fixed Parquet schema means a type change errors. Physical-limit tests (altitude, speed, bounding box) catch the classic swapped-index bug, and 429 is treated as "skip", not "retry and spam".
 5. **It respects the budget by design.** The bounding box was chosen for its credit tier (≈71 sq° → 2 credits), and a unit test fails if someone widens it.
 6. **No lock fights.** dbt writes `warehouse.duckdb` and the dashboard reads an atomically swapped `serving.duckdb`.
+7. **Airport data that can be re-fetched is re-fetched.** Unlike live positions, OpenSky's flight history is available later, so the daily airport DAG uses `catchup`: days missed while the laptop was off fill in automatically.
 
 ## 6. What I'd improve
 
@@ -126,7 +135,8 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 | Managed Identity / SAS token instead of an account key | The connection string gives full account access ([THREAT.md](docs/THREAT.md) T-03) |
 | gitleaks + Actions pinned by SHA in CI | Supply-chain and secret hygiene |
 | Trajectory-based flight phases (1-min polling, ≤25 sq° box around FRA = 1 credit) | Snapshot phases can misclassify single noisy points |
-| Join airports (OurAirports) to detect departures/arrivals per airport | Turns traffic into airport operations metrics |
+| Full airport reference data (OurAirports) instead of the 54-airport seed | Every route gets a readable name, not only the common ones |
+| Airport punctuality (compare with published schedules) | ADS-B gives actual times only; delays need schedule data |
 | Real Azure deployment (Container Apps + Storage) | Moves cloud from emulated to production |
 
 ## 7. Run it
@@ -139,7 +149,7 @@ cp .env.example .env            # paste OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRE
 docker compose up -d --build    # Airflow  http://localhost:8080  (no login locally)
                                 # Dashboard http://localhost:8501
 ```
-The first ingest lands within 10 minutes, and the first dashboard data appears after the next `:05` past the hour.
+The first ingest lands within 10 minutes, and the first dashboard data appears after the next `:05` past the hour. Airport arrivals/departures appear after the daily 06:15 UTC run (it also fills in all earlier days automatically).
 
 **Without Docker or credentials (2 minutes):**
 ```bash
@@ -156,8 +166,8 @@ SERVING_DB_PATH=data/lake/serving.duckdb streamlit run dashboard/app.py
 
 ```
 src/flightpipe/     opensky_client.py · transform.py · storage.py · config.py   (all logic, unit-tested)
-airflow/dags/       opensky_ingest.py · flight_transform.py                        (wiring only)
-dbt/                models/staging · models/marts · tests · macros
+airflow/dags/       opensky_ingest.py · flight_transform.py · airport_flights_daily.py   (wiring only)
+dbt/                models/staging · models/marts · seeds/airports.csv · tests · macros
 dashboard/app.py    Streamlit
 scripts/            generate_sample_data.py · measure_pipeline.py · inject_bad_snapshot.py
 tests/              pytest (HTTP mocked)

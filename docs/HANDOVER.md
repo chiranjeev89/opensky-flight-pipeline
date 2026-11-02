@@ -1,6 +1,15 @@
 # HANDOVER
 Newest entry on top. Read this + ARCHITECTURE.md + CONSTRAINTS.md first, update this last.
 
+## 2026-11-02
+Done:
+- FEATURE-004: Frankfurt/Munich arrivals + departures (daily DAG with catchup), 3 airport marts + airport seed, dashboard section, data-freshness table, CI sample data.
+- Verified: pytest 28 passed; dbt 58/58; airport DAG end-to-end against Azurite + fake OpenSky.
+In progress:
+- First live airport run on the laptop (needs start.bat to rebuild the Airflow image).
+Next:
+- Day 6 robustness tests (4 Nov). Day 7: live results, README, v1.0.
+
 ## 2026-10-30
 Done:
 - First live run on Windows + Docker Desktop: both DAGs green, dashboard live (580 aircraft, p95 API 260 ms).

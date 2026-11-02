@@ -99,6 +99,7 @@ Say "Waiting for the DAGs to be parsed"
 for ($i = 0; $i -lt 30; $i++) { if ((AF @("dags", "list")) -match "opensky_ingest") { break }; Start-Sleep -Seconds 5 }
 AF @("dags", "unpause", "opensky_ingest") | Out-Null
 AF @("dags", "unpause", "flight_transform") | Out-Null
+AF @("dags", "unpause", "airport_flights_daily") | Out-Null   # FEATURE-004: catchup fills earlier days on its own
 
 Say "Run 1/2: opensky_ingest (OpenSky -> Azure Blob)"
 AF @("dags", "trigger", "opensky_ingest") | Out-Null

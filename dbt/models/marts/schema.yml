@@ -32,3 +32,27 @@ models:
     columns:
       - name: run_date
         data_tests: [not_null, unique]
+  - name: fct_airport_hourly
+    description: FEATURE-004. Arrivals, departures and movements per airport per UTC hour.
+    data_tests:
+      - dbt_utils_free_unique_combo:
+          arguments:
+            columns: ["airport", "movement_hour"]
+    columns:
+      - name: movements
+        data_tests: [not_null]
+  - name: fct_airport_daily
+    description: FEATURE-004. One row per airport per day, with unknown-origin/destination quality columns.
+    data_tests:
+      - dbt_utils_free_unique_combo:
+          arguments:
+            columns: ["airport", "flight_date"]
+  - name: fct_routes
+    description: FEATURE-004. Busiest routes; each physical flight counted once.
+    data_tests:
+      - dbt_utils_free_unique_combo:
+          arguments:
+            columns: ["departure_airport", "arrival_airport"]
+    columns:
+      - name: flights
+        data_tests: [not_null]

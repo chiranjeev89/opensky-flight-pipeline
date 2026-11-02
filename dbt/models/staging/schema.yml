@@ -33,3 +33,23 @@ models:
           - accepted_values:
               arguments:
                 values: ["success"]
+
+  - name: stg_airport_flights
+    description: FEATURE-004. Cleaned arrivals/departures per collected airport. Grain = airport x direction x flight.
+    data_tests:
+      - dbt_utils_free_unique_combo:
+          arguments:
+            columns: ["airport", "direction", "icao24", "departure_ts"]
+    columns:
+      - name: icao24
+        data_tests: [not_null]
+      - name: airport
+        data_tests: [not_null]
+      - name: direction
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["arrival", "departure"]
+      - name: event_ts
+        data_tests: [not_null]

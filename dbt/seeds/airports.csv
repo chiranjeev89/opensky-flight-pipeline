@@ -1,0 +1,55 @@
+icao,iata,airport_name,city,country
+EDDF,FRA,Frankfurt am Main,Frankfurt,Germany
+EDDM,MUC,Munich,Munich,Germany
+EDDB,BER,Berlin Brandenburg,Berlin,Germany
+EDDH,HAM,Hamburg,Hamburg,Germany
+EDDL,DUS,Düsseldorf,Düsseldorf,Germany
+EDDK,CGN,Cologne Bonn,Cologne,Germany
+EDDS,STR,Stuttgart,Stuttgart,Germany
+EDDN,NUE,Nuremberg,Nuremberg,Germany
+EDDV,HAJ,Hannover,Hannover,Germany
+EDDP,LEJ,Leipzig/Halle,Leipzig,Germany
+EDDW,BRE,Bremen,Bremen,Germany
+EDDC,DRS,Dresden,Dresden,Germany
+EGLL,LHR,London Heathrow,London,United Kingdom
+EGKK,LGW,London Gatwick,London,United Kingdom
+EGCC,MAN,Manchester,Manchester,United Kingdom
+EIDW,DUB,Dublin,Dublin,Ireland
+LFPG,CDG,Paris Charles de Gaulle,Paris,France
+LFPO,ORY,Paris Orly,Paris,France
+LFMN,NCE,Nice Côte d'Azur,Nice,France
+EHAM,AMS,Amsterdam Schiphol,Amsterdam,Netherlands
+EBBR,BRU,Brussels,Brussels,Belgium
+LSZH,ZRH,Zurich,Zurich,Switzerland
+LSGG,GVA,Geneva,Geneva,Switzerland
+LOWW,VIE,Vienna,Vienna,Austria
+LEMD,MAD,Madrid Barajas,Madrid,Spain
+LEBL,BCN,Barcelona El Prat,Barcelona,Spain
+LEPA,PMI,Palma de Mallorca,Palma,Spain
+LEMG,AGP,Málaga,Málaga,Spain
+GCLP,LPA,Gran Canaria,Las Palmas,Spain
+LIRF,FCO,Rome Fiumicino,Rome,Italy
+LIMC,MXP,Milan Malpensa,Milan,Italy
+LPPT,LIS,Lisbon,Lisbon,Portugal
+EKCH,CPH,Copenhagen,Copenhagen,Denmark
+ESSA,ARN,Stockholm Arlanda,Stockholm,Sweden
+ENGM,OSL,Oslo Gardermoen,Oslo,Norway
+EFHK,HEL,Helsinki,Helsinki,Finland
+EPWA,WAW,Warsaw Chopin,Warsaw,Poland
+LKPR,PRG,Prague,Prague,Czechia
+LHBP,BUD,Budapest,Budapest,Hungary
+LGAV,ATH,Athens,Athens,Greece
+LTFM,IST,Istanbul,Istanbul,Türkiye
+LTAI,AYT,Antalya,Antalya,Türkiye
+OMDB,DXB,Dubai International,Dubai,United Arab Emirates
+OTHH,DOH,Hamad International,Doha,Qatar
+KJFK,JFK,New York JFK,New York,United States
+KEWR,EWR,Newark Liberty,Newark,United States
+KORD,ORD,Chicago O'Hare,Chicago,United States
+CYYZ,YYZ,Toronto Pearson,Toronto,Canada
+VIDP,DEL,Delhi Indira Gandhi,Delhi,India
+VABB,BOM,Mumbai,Mumbai,India
+RJAA,NRT,Tokyo Narita,Tokyo,Japan
+ZBAA,PEK,Beijing Capital,Beijing,China
+VHHH,HKG,Hong Kong,Hong Kong,China
+WSSS,SIN,Singapore Changi,Singapore,Singapore

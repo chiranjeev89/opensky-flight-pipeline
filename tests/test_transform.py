@@ -63,3 +63,32 @@ def test_parquet_schema_is_fixed_even_when_all_null():
 def test_empty_snapshot_still_writes_valid_parquet():
     table = pq.read_table(io.BytesIO(to_parquet_bytes([])))
     assert table.num_rows == 0 and table.schema.names == ARROW_SCHEMA.names
+
+
+# ---- FEATURE-004 ------------------------------------------------------------
+from datetime import date  # noqa: E402
+
+from flightpipe.transform import FLIGHT_SCHEMA, flights_to_parquet  # noqa: E402
+
+
+def test_flights_parquet_renames_and_keeps_schema():
+    f = {
+        "icao24": "3c6444",
+        "firstSeen": 1,
+        "lastSeen": 2,
+        "estDepartureAirport": "EDDF",
+        "estArrivalAirport": None,
+        "callsign": None,
+        "unknownFutureField": 7,
+    }
+    t = pq.read_table(io.BytesIO(flights_to_parquet([f], "EDDF", "departure", date(2026, 11, 1))))
+    assert t.schema.equals(FLIGHT_SCHEMA, check_metadata=False)
+    row = t.to_pylist()[0]
+    assert row["est_departure_airport"] == "EDDF" and row["est_arrival_airport"] is None
+    assert row["query_airport"] == "EDDF" and row["direction"] == "departure"
+    assert row["dep_candidates"] is None  # missing key -> null, no crash
+
+
+def test_empty_flight_day_is_valid_parquet():
+    t = pq.read_table(io.BytesIO(flights_to_parquet([], "EDDM", "arrival", date(2026, 11, 1))))
+    assert t.num_rows == 0 and t.schema.names == FLIGHT_SCHEMA.names
