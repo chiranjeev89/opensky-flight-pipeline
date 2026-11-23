@@ -24,6 +24,8 @@ vars:
   # FEATURE-004: airports whose arrivals/departures are collected (keep in sync with AIRPORTS env var)
   airports: ['EDDF', 'EDDM']
   max_airport_data_age_days: 3
+  # BUG-010: a day below this share of the airport's median day is flagged incomplete
+  min_complete_day_share: 0.5
   # Longest plausible flight; anything longer is a tracking error
   max_flight_duration_min: 1200
   # Must match the BBOX_* env vars used by the ingest DAG

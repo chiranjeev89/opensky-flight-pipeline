@@ -18,6 +18,8 @@ Real commands and what a pass looks like. Paste real output, never "tests pass".
 | 5c | **Upgrade without airport data**: remove `raw/airport_flights`, run `make dbt` | `PASS=58` (bootstrap file written by sync_lake; locally run `ensure_bootstrap_files` first) |
 | 10 | After 06:15 UTC → Airflow → `airport_flights_daily` | one green run per day since 30 Oct (catchup) |
 
+| 5d | **Incomplete airport day**: cut one day's `EDDF_arrival.parquet` to 2 rows, `make dbt` | `WARN 1 assert_airport_days_complete`, `PASS=59`, publish continues; dashboard shows the yellow warning |
+
 ## What the unit tests cover
 - Field mapping by name, lon/lat order (index 5 vs 6), null `states`, short rows, extra fields, all-null columns, empty Parquet.
 - Client: bearer header + bbox params, token caching, 429 no-retry, 5xx retry then success, 5xx give up, 401 refresh once, secret not leaked in errors.
@@ -44,4 +46,12 @@ dbt build: PASS=58 WARN=0 ERROR=0 SKIP=0 TOTAL=58
 airport DAG vs Azurite + fake OpenSky: success, day 2026-11-01, 4 files landed (EDDM arrival 404 -> 0 rows)
 upgrade without airport files: without bootstrap ERROR=1 SKIP=18 -> with bootstrap PASS=58
 dashboard AppTest: no exceptions (also on an old DB without airport tables)
+```
+
+## Verified run (2026-11-23, BUG-010)
+```
+pytest: 31 passed, 1 skipped
+dbt build (clean synthetic): PASS=60 · with one cut day: PASS=59 WARN=1
+airport DAG vs Azurite + fake OpenSky: success, 12 calls for 20/21/22 Nov
+dashboard AppTest: no exceptions on new DB (warning shown) and on pre-BUG-010 DB
 ```

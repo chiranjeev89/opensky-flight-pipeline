@@ -69,11 +69,17 @@ def main() -> None:
     print(f"| Duplicate rows removed by staging | {dq[2]:,} |")
     # FEATURE-004: airport numbers (skipped on databases built before the airport models)
     try:
-        for ap, days_, avg_mov, peak in con.execute(
-            """select airport, count(*), round(avg(movements)), max(movements)
+        # BUG-010: averages use complete days only; incomplete days are reported, not hidden.
+        for ap, days_, bad, avg_mov, peak in con.execute(
+            """select airport, count(*) filter (where is_complete_day),
+                      count(*) filter (where not is_complete_day),
+                      round(avg(movements) filter (where is_complete_day)), max(movements)
                from fct_airport_daily group by 1 order by 1"""
         ).fetchall():
-            print(f"| {ap} movements per day (avg / max, {days_} days) | {avg_mov:,.0f} / {peak:,} |")
+            print(
+                f"| {ap} movements per day (avg / max, {days_} complete days, "
+                f"{bad} incomplete excluded) | {avg_mov:,.0f} / {peak:,} |"
+            )
         top = con.execute("select route, flights from fct_routes order by flights desc limit 3").fetchall()
         if top:
             print("| Busiest routes | " + ", ".join(f"{r} ({n})" for r, n in top) + " |")

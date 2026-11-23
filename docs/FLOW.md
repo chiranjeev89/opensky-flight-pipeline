@@ -47,8 +47,8 @@ docker compose build → DagBag import check inside real Airflow image
 ## Path 5: airport flights (daily at 06:15 UTC, FEATURE-004)
 ```
 airflow/dags/airport_flights_daily.py :: fetch_and_land_day()
- ├─ day = data_interval_end - 1 day                  (last complete UTC day; catchup fills missed days)
- ├─ for airport in AIRPORTS (EDDF, EDDM), direction in (arrival, departure):
+ ├─ days = dates.days_to_fetch(data_interval_end, 3)  (yesterday + 2 days before: late data, BUG-010)
+ ├─ for day, airport in AIRPORTS (EDDF, EDDM), direction in (arrival, departure):
  │    ├─ opensky_client.py :: fetch_airport_flights() -> _get('/flights/<direction>')   404 -> []
  │    ├─ transform.py :: flights_to_parquet()         fixed FLIGHT_SCHEMA
  │    └─ storage.py :: upload_snapshot(path=airport_flights_path())

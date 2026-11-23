@@ -16,7 +16,7 @@ Status: ✅ verified · ❓ unverified · ❌ wrong. Clear every ❓ before call
 | A-11 | Synthetic numbers in README will be replaced | ❓ | README Results says "live" + date |
 
 | A-12 | `/flights/*` calls cost few credits from their own bucket; 4 calls/day are negligible | ✅ | 2026-11-02 live logs: ~30 credits per call, 120 per day (3880 → 3760 → 3640 over 3 catch-up days), separate 4,000/day bucket |
-| A-13 | OpenSky's nightly batch is done by 06:15 UTC | ✅ (partly) | 2026-11-02 08:09 UTC: 1 Nov had FRA 577 arr / 506 dep, MUC 429 / 389. Re-check a run that fires exactly at 06:15 |
+| A-13 | OpenSky's nightly batch is done by 06:15 UTC | ❌ not always | True on most days, but 8, 10, 11, 12 Nov 2026 were nearly empty even when fetched hours later (BUG-010). Handled by the 3-day re-fetch window + completeness flag |
 | A-14 | Unknown origin/destination share in real data is moderate (< 20%) | ✅ | 2026-11-02 dashboard: FRA 16.2% of arrivals with unknown origin on 1 Nov |
 
 Open questions

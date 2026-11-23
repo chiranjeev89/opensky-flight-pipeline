@@ -61,3 +61,36 @@ def test_default_airports_are_frankfurt_and_munich(monkeypatch):
     assert get_settings().airports == ("EDDF", "EDDM")
     monkeypatch.setenv("AIRPORTS", " eddf, eddm ,edds")
     assert get_settings().airports == ("EDDF", "EDDM", "EDDS")
+
+
+# ---- BUG-010: re-fetch window for late OpenSky airport data --------------------
+
+
+def test_days_to_fetch_is_last_three_complete_days():
+    from datetime import UTC, date, datetime
+
+    from flightpipe.dates import days_to_fetch
+
+    end = datetime(2026, 11, 23, 6, 15, tzinfo=UTC)
+    assert days_to_fetch(end) == [date(2026, 11, 20), date(2026, 11, 21), date(2026, 11, 22)]
+    assert days_to_fetch(end, 1) == [date(2026, 11, 22)]  # old behaviour, never today
+
+
+def test_days_to_fetch_rejects_zero():
+    from datetime import UTC, datetime
+
+    import pytest
+
+    from flightpipe.dates import days_to_fetch
+
+    with pytest.raises(ValueError):
+        days_to_fetch(datetime(2026, 11, 23, tzinfo=UTC), 0)
+
+
+def test_lookback_setting(monkeypatch):
+    from flightpipe.config import get_settings
+
+    monkeypatch.delenv("AIRPORT_LOOKBACK_DAYS", raising=False)
+    assert get_settings().airport_lookback_days == 3
+    monkeypatch.setenv("AIRPORT_LOOKBACK_DAYS", "5")
+    assert get_settings().airport_lookback_days == 5

@@ -18,4 +18,4 @@ Open questions: A-12 (credit cost of /flights), A-13 (batch timing), A-14 (share
 - 2026-11-02 08:09 UTC first live run on the laptop (catchup 30 Oct - 1 Nov), all green after the image rebuild:
   30 Oct FRA 586 arr / 596 dep, MUC 443 / 444; 31 Oct FRA 556 / 542, MUC 395 / 392; 1 Nov FRA 577 / 506, MUC 429 / 389.
   One attempt failed with ImportError because it ran on the old image before start.bat rebuilt it; the automatic retry succeeded (DAG files are mounted live, src/ is baked into the image).
-
+- 2026-11-23 Three weeks live: 24 airport days, of which 4 nearly empty (BUG-010). Added 3-day re-fetch window and is_complete_day flag (D-015).

@@ -42,11 +42,16 @@ models:
       - name: movements
         data_tests: [not_null]
   - name: fct_airport_daily
-    description: FEATURE-004. One row per airport per day, with unknown-origin/destination quality columns.
+    description: >
+      FEATURE-004. One row per airport per day, with unknown-origin/destination quality columns
+      and is_complete_day (BUG-010).
     data_tests:
       - dbt_utils_free_unique_combo:
           arguments:
             columns: ["airport", "flight_date"]
+    columns:
+      - name: is_complete_day
+        data_tests: [not_null]
   - name: fct_routes
     description: FEATURE-004. Busiest routes; each physical flight counted once.
     data_tests:

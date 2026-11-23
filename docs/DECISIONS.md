@@ -89,3 +89,12 @@ Context: dbt sources read `<dir>/**/*.parquet`; DuckDB errors when no file match
 Options: 1) accept a failing transform until 06:15  2) make the transform depend on the airport DAG  3) write a 0-row file with the real schema in the local cache
 Chosen: 3
 Why: Zero effect on results, keeps hourly publishing independent of the daily job, local-only (never uploaded).
+
+## D-015: Re-fetch window + volume check for airport data
+Date: 2026-11-23
+Context: BUG-010. Four days of OpenSky airport data were nearly empty; every run was still green.
+Options: 1) fail the transform on a small day  2) retry the same day until it looks full  3) re-fetch the last 3 days on every run, flag days far below the airport's median, warn and exclude them from averages
+Chosen: 3
+Why: Failing would freeze the live dashboard over a third-party gap (same lesson as BUG-009). Retrying one day cannot tell "late" from "really quiet". A rolling re-fetch fixes late data for free, the median baseline is robust to a few bad days, and nothing is hidden.
+Trade-off: 3x the airport API calls (~360/4,000 credits). A genuinely quiet day (strike, storm) below 50% of normal would be flagged as incomplete; the warning lists it, so a human can judge.
+Revisit if: more airports are added (credits scale with airports x lookback) or OpenSky publishes a "batch complete" signal.

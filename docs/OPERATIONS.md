@@ -53,3 +53,9 @@ python scripts/measure_pipeline.py --db data/lake/serving.duckdb
 ## After changing code in src/
 DAG and dbt files are read live, but `src/flightpipe` is built into the Airflow image. After any change in `src/`, run **start.bat** (it rebuilds) or the DAGs will import the old code (seen 2026-11-02: one ImportError, fixed by the rebuild + retry).
 
+## Repair incomplete airport days (BUG-010)
+The dashboard lists incomplete days in a yellow warning. Days in the last 3 days fix themselves on the next daily run. For older days:
+1. Airflow (localhost:8080) -> Dags -> **airport_flights_daily** -> **Runs** tab.
+2. Find the run **one day after** the bad day (the run of 9 Nov fetched 6-8 Nov).
+3. Click it -> **Clear** -> confirm. It re-fetches its 3 days and overwrites the files.
+4. Wait for the next hourly transform (or Trigger **flight_transform**), then refresh the dashboard.

@@ -15,7 +15,7 @@ Dependency by dependency: slow, down, wrong, empty. Plus the first limits.
 | F-09 | **Stale data** (> 3 h) | `assert_data_is_fresh` **warns** | Warning in dbt log; dashboard "Data as of" | Check ingest DAG |
 | F-10 | **Disk full on lake volume** | Sync/dbt fail | Failed task | Prune old partitions (Blob keeps the original) |
 
-| F-11 | **Airport batch late / empty** (OpenSky nightly job) | 404 → empty day; low counts are kept as-is | `fct_airport_daily` shows an unusually low day; freshness warning after 3 days | Re-run that day's DAG run (Clear) → file is overwritten |
+| F-11 | **Airport batch late / incomplete** (OpenSky nightly job; seen 8-12 Nov 2026, BUG-010) | Next 2 daily runs re-fetch the day automatically; days below 50% of normal are flagged `is_complete_day = false`, excluded from averages | dbt WARN `assert_airport_days_complete`; yellow warning on the dashboard | Older than 3 days: Clear the run in Airflow (OPERATIONS.md) |
 | F-12 | **No airport file yet** (fresh install/upgrade) | 0-row bootstrap file keeps dbt green (D-014) | Dashboard: "No airport data yet" | Automatic at next 06:15 UTC run |
 
 ## First limits I expect to hit

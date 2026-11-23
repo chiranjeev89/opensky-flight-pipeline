@@ -85,6 +85,8 @@ try:
     daily = query("select * from fct_airport_daily order by airport, flight_date")
 except duckdb.CatalogException:
     daily = pd.DataFrame()  # serving DB published before the airport models existed
+if not daily.empty and "is_complete_day" not in daily.columns:
+    daily["is_complete_day"] = True  # serving DB published before BUG-010
 
 if daily.empty:
     st.info(
@@ -97,25 +99,37 @@ else:
         "Airport", airports, format_func=lambda a: AIRPORT_NAMES.get(a, a), horizontal=True, key="airport"
     )
     d = daily[daily["airport"] == choice]
-    last = d.iloc[-1]
+    complete = d[d["is_complete_day"]]  # BUG-010: incomplete days never feed averages
+    last = complete.iloc[-1] if not complete.empty else d.iloc[-1]
     k1, k2, k3, k4 = st.columns(4)
     k1.metric(f"Movements on {last['flight_date']:%d %b}", f"{int(last['movements']):,}")
     k2.metric("Arrivals / departures", f"{int(last['arrivals'])} / {int(last['departures'])}")
-    k3.metric("Avg movements per day", f"{d['movements'].mean():,.0f}")
+    k3.metric(
+        f"Avg movements per day ({len(complete)} complete days)", f"{complete['movements'].mean():,.0f}"
+    )
     k4.metric("Unknown origin (arrivals)", f"{last['pct_unknown_origin']:.1f}%")
+    bad = d[~d["is_complete_day"]]
+    if not bad.empty:
+        days = ", ".join(f"{x:%d %b}" for x in bad["flight_date"])
+        st.warning(
+            f"Incomplete days in OpenSky's airport data (left out of averages): {days}. "
+            "The daily job re-fetches the last 3 days; older days can be repaired by clearing their "
+            "airport_flights_daily run in Airflow."
+        )
 
     a1, a2 = st.columns(2)
     with a1:
         st.subheader("Typical day: movements by local hour")
-        prof = query(
-            """select hour_of_day_local as hour,
-                       round(avg(arrivals), 1) as arrivals, round(avg(departures), 1) as departures
-                from fct_airport_hourly where airport = ?
-                group by 1 order by 1""",
-            (choice,),
-        )
+        profile_sql = """select hour_of_day_local as hour,
+                   round(avg(arrivals), 1) as arrivals, round(avg(departures), 1) as departures
+            from fct_airport_hourly where airport = ? {extra}
+            group by 1 order by 1"""
+        try:
+            prof = query(profile_sql.format(extra="and is_complete_day"), (choice,))
+        except duckdb.BinderException:  # serving DB published before BUG-010
+            prof = query(profile_sql.format(extra=""), (choice,))
         st.bar_chart(prof.set_index("hour"), stack=False)
-        st.caption("Average over all collected days. Hours in Europe/Berlin time.")
+        st.caption("Average over complete days only. Hours in Europe/Berlin time.")
     with a2:
         st.subheader("Busiest routes")
         routes = query(
@@ -128,16 +142,23 @@ else:
         st.dataframe(routes, width="stretch", hide_index=True)
         st.caption("median_min = time OpenSky's receivers saw the flight, not gate-to-gate block time.")
 
-    st.subheader("Movements per day")
-    per_day = daily.assign(day=daily["flight_date"].astype(str))  # text labels -> full-width bars
-    st.bar_chart(per_day.pivot(index="day", columns="airport", values="movements"), stack=False)
+    st.subheader(f"Movements per day: {AIRPORT_NAMES.get(choice, choice)}")
+    per_day = d.assign(
+        day=d["flight_date"].astype(str),  # text labels -> full-width bars
+        status=d["is_complete_day"].map({True: "complete", False: "incomplete (OpenSky gap)"}),
+    )
+    st.bar_chart(per_day, x="day", y="movements", color="status")
 
 st.subheader("Data freshness")
 fresh = [
     {"dataset": "Live positions (every 10 min)", "newest": f"{pd.Timestamp(newest):%Y-%m-%d %H:%M} UTC"},
     {
         "dataset": "Airport arrivals/departures (daily)",
-        "newest": f"{daily['flight_date'].max():%Y-%m-%d} (full day)" if not daily.empty else "none yet",
+        "newest": (
+            f"{daily.loc[daily['is_complete_day'], 'flight_date'].max():%Y-%m-%d} (newest complete day)"
+            if not daily.empty and daily["is_complete_day"].any()
+            else "none yet"
+        ),
     },
 ]
 st.dataframe(pd.DataFrame(fresh), width="stretch", hide_index=True)

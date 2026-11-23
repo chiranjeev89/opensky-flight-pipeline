@@ -93,6 +93,10 @@ class Settings:
         )
     )
 
+    # BUG-010: re-fetch this many completed days on every daily run (late OpenSky data)
+    # 3 days x 2 airports x 2 directions = 12 calls/day (~360 of 4,000 /flights credits).
+    airport_lookback_days: int = field(default_factory=lambda: int(_env("AIRPORT_LOOKBACK_DAYS", "3")))
+
     @property
     def has_opensky_credentials(self) -> bool:
         return bool(self.opensky_client_id and self.opensky_client_secret)

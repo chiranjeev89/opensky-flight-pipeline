@@ -1,6 +1,14 @@
 # HANDOVER
 Newest entry on top. Read this + ARCHITECTURE.md + CONSTRAINTS.md first, update this last.
 
+## 2026-11-23
+Done:
+- Reviewed 3.5 weeks of live logs: 1,534 ingest runs (1 failed), 465,351 positions, 281 published transforms, 24 airport days.
+- BUG-010: 4 nearly empty airport days (OpenSky batch). Added 3-day re-fetch, is_complete_day flag, warn test, dashboard warning (D-015).
+Next:
+- User: start.bat (rebuild), clear the 4 airport runs, commit + push.
+- Day 7 finishing: robustness notes, final README numbers, screenshot, CD, master PDF, v1.0.
+
 ## 2026-11-02
 Done:
 - FEATURE-004: Frankfurt/Munich arrivals + departures (daily DAG with catchup), 3 airport marts + airport seed, dashboard section, data-freshness table, CI sample data.

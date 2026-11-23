@@ -41,7 +41,7 @@ flowchart LR
         end
         BLOB[("Azure Blob Storage<br/>(Azurite locally)<br/>raw/states/date=/hour=/*.parquet<br/>raw/runs/*.parquet<br/>raw/airport_flights/*.parquet")]
         LAKE[("/opt/lake<br/>local cache")]
-        DBT["dbt build<br/>3 staging · 9 marts · 1 seed<br/>45 data tests"]
+        DBT["dbt build<br/>3 staging · 9 marts · 1 seed<br/>47 data tests"]
         WH[("warehouse.duckdb")]
         SV[("serving.duckdb<br/>published only<br/>if tests pass")]
         DASH["Streamlit dashboard<br/>:8501 · read-only"]
@@ -86,9 +86,10 @@ The pipeline measures itself. Every ingest run writes a metrics row (`raw/runs/`
 | **Rows / storage per day** | `fct_pipeline_health` | state vectors and MB of Parquet |
 | **% missing position / callsign** | `fct_data_quality` | quality of the raw feed |
 | **Duplicates removed** | `fct_data_quality` | raw rows − cleaned rows |
-| **Data tests passed** | `dbt build` | 45 data tests (35 generic + 10 singular) on every hourly run |
+| **Data tests passed** | `dbt build` | 47 data tests (36 generic + 11 singular) on every hourly run |
 | **Airport movements per day** | `fct_airport_daily` | arrivals + departures at FRA and MUC, with % unknown origin/destination |
 | **Airport data freshness** | `assert_airport_data_is_fresh` | newest complete airport day ≤ 3 days old (warning) |
+| **Airport day completeness** | `fct_airport_daily.is_complete_day` | arrivals and departures each ≥ 50% of the airport's median day; incomplete days are flagged and excluded from averages (BUG-010) |
 | **Credit budget** | design | `/states`: 144 runs × 2 credits = **288/day = 7% of quota**; `/flights`: 4 calls/day (separate bucket) |
 
 Reproduce every number with one command: `make measure` (runs [scripts/measure_pipeline.py](scripts/measure_pipeline.py)).
@@ -108,8 +109,8 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 | Unique aircraft seen | 400 |
 | Peak airborne aircraft in one hour | 275 |
 | Rows missing position | 2.09% |
-| dbt build | **58 / 58 PASS** (12 models, 1 seed, 45 tests) |
-| Unit tests | 28 passed (+1 DAG import test run in CI Docker job) |
+| dbt build | **60 / 60 PASS** (12 models, 1 seed, 47 tests) |
+| Unit tests | 31 passed (+1 DAG import test run in CI Docker job) |
 | **Negative test**: injected impossible snapshot (98,000 ft, 900 m/s, lat/lon swapped) | **systemic-glitch test FAILS → 18 downstream nodes SKIPPED → nothing published** ✅ |
 | **Real-world glitch handling** (found in live data, BUG-009) | 2 transponder glitches (> 750 kt) flagged and excluded, counted in `implausible_rows`, publish continues ✅ |
 
@@ -123,7 +124,8 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 4. **It fails loudly, not silently.** A fixed Parquet schema means a type change errors. Physical-limit tests (altitude, speed, bounding box) catch the classic swapped-index bug, and 429 is treated as "skip", not "retry and spam".
 5. **It respects the budget by design.** The bounding box was chosen for its credit tier (≈71 sq° → 2 credits), and a unit test fails if someone widens it.
 6. **No lock fights.** dbt writes `warehouse.duckdb` and the dashboard reads an atomically swapped `serving.duckdb`.
-7. **Airport data that can be re-fetched is re-fetched.** Unlike live positions, OpenSky's flight history is available later, so the daily airport DAG uses `catchup`: days missed while the laptop was off fill in automatically.
+7. **Airport data that can be re-fetched is re-fetched.** Unlike live positions, OpenSky's flight history is available later, so the daily airport DAG uses `catchup` and re-fetches the last 3 days on every run: days missed while the laptop was off, or published late by OpenSky (BUG-010), fill in automatically.
+8. **"Green" is not the same as "complete".** A volume check against each airport's median day flags days where the source sent far too little data, instead of quietly averaging them in.
 
 ## 6. What I'd improve
 
