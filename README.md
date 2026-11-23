@@ -2,7 +2,7 @@
 
 **Live ADS-B data from the OpenSky Network → Airflow → Azure Blob Storage (Azure SDK, run locally on Microsoft's Azurite emulator) → dbt (models + tests) → dashboard. Runs in Docker; CI/CD with GitHub Actions.**
 
-[![CI](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml)
+[![CI](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml) [![Live demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://opensky-flightops.streamlit.app/)
 ![Python](https://img.shields.io/badge/python-3.12-blue) ![Airflow](https://img.shields.io/badge/Airflow-3.1-017CEE) ![dbt](https://img.shields.io/badge/dbt-duckdb-FF694B) ![Azure](https://img.shields.io/badge/Azure%20Blob-Azurite%20emulator-0078D4)
 
 ![Dashboard: live traffic over Germany](docs/img/dashboard.png)
@@ -156,7 +156,7 @@ Collected on a laptop over 3.5 weeks; it was switched off on some days (college,
 
 ## 7. Live demo and CI/CD
 
-- **Live demo:** _add your Streamlit Community Cloud link here_ — a frozen snapshot of the real results (3.4 MB, marts only, built with `scripts/make_demo_db.py`). No pipeline runs there, so it costs nothing and spends no API credits.
+- **Live demo:** [opensky-flightops.streamlit.app](https://opensky-flightops.streamlit.app/) — a frozen snapshot of the real results (3.4 MB, marts only, built with `scripts/make_demo_db.py`). No pipeline runs there, so it costs nothing and spends no API credits.
 - **CI** (`.github/workflows/ci.yml`, every push): ruff lint → 31 unit tests (OpenSky mocked) → dbt build with all 49 data tests on synthetic data → Docker build + Airflow DAG import check.
 - **CD** (`.github/workflows/release.yml`, every `v*` tag): builds the Airflow and dashboard images and publishes them to GitHub Container Registry:
   ```bash
