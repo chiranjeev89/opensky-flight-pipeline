@@ -1,11 +1,11 @@
 # ✈️ Flight Operations Data Pipeline
 
-**Live ADS-B data from the OpenSky Network → Airflow → Azure Blob Storage → dbt (models + tests) → dashboard. Runs in Docker, verified by GitHub Actions.**
+**Live ADS-B data from the OpenSky Network → Airflow → Azure Blob Storage (Azure SDK, run locally on Microsoft's Azurite emulator) → dbt (models + tests) → dashboard. Runs in Docker; CI/CD with GitHub Actions.**
 
 [![CI](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/chiranjeev89/opensky-flight-pipeline/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.12-blue) ![Airflow](https://img.shields.io/badge/Airflow-3.1-017CEE) ![dbt](https://img.shields.io/badge/dbt-duckdb-FF694B) ![Azure](https://img.shields.io/badge/Azure-Blob-0078D4)
+![Python](https://img.shields.io/badge/python-3.12-blue) ![Airflow](https://img.shields.io/badge/Airflow-3.1-017CEE) ![dbt](https://img.shields.io/badge/dbt-duckdb-FF694B) ![Azure](https://img.shields.io/badge/Azure%20Blob-Azurite%20emulator-0078D4)
 
-<!-- Add a screenshot after the first live run: docs/img/dashboard.png -->
+![Dashboard: live traffic over Germany](docs/img/dashboard.png)
 
 ---
 
@@ -41,7 +41,7 @@ flowchart LR
         end
         BLOB[("Azure Blob Storage<br/>(Azurite locally)<br/>raw/states/date=/hour=/*.parquet<br/>raw/runs/*.parquet<br/>raw/airport_flights/*.parquet")]
         LAKE[("/opt/lake<br/>local cache")]
-        DBT["dbt build<br/>3 staging · 9 marts · 1 seed<br/>47 data tests"]
+        DBT["dbt build<br/>3 staging · 10 marts · 1 seed<br/>49 data tests"]
         WH[("warehouse.duckdb")]
         SV[("serving.duckdb<br/>published only<br/>if tests pass")]
         DASH["Streamlit dashboard<br/>:8501 · read-only"]
@@ -69,10 +69,10 @@ Static image for slides/LinkedIn: [docs/img/architecture.png](docs/img/architect
 |---|---|---|
 | Ingest | Python + `requests`, OAuth2 client credentials | Only auth flow OpenSky supports since March 2026 |
 | Orchestration | Apache Airflow 3 | Retries, scheduling and a UI; used in most German data-engineering roles |
-| Storage | Azure Blob, Parquet, Hive partitions | Cheap, durable, columnar; Azurite emulates it locally for free |
+| Storage | Azure Blob (Azure SDK) on Microsoft's Azurite emulator, Parquet, Hive partitions | Same code and API as Azure Storage at €0; switching to a real storage account is one line in `.env` ([D-003](docs/DECISIONS.md)) |
 | Transform | dbt + DuckDB | SQL with lineage, tests and docs; €0 compute; runs in CI |
 | Serving | Streamlit | Python, in git, one container |
-| Packaging/CI | Docker Compose, GitHub Actions | One-command start; every push proven |
+| Packaging/CI/CD | Docker Compose, GitHub Actions, GitHub Container Registry | One-command start; every push tested; every release published as images |
 
 ## 3. Measure: what I track, and how
 
@@ -80,13 +80,13 @@ The pipeline measures itself. Every ingest run writes a metrics row (`raw/runs/`
 
 | Metric | Source | Definition |
 |---|---|---|
-| **Schedule completeness** | `fct_pipeline_health` | runs landed ÷ 144 expected per day |
+| **Schedule completeness** | `fct_pipeline_health` | distinct 10-minute slots with a landed run ÷ 144 per day (capped at 100%) |
 | **API latency avg / p95** | `fct_pipeline_health` | time for `/states/all`, measured in the task |
 | **Credits remaining** | `fct_pipeline_health` | from the `X-Rate-Limit-Remaining` header |
 | **Rows / storage per day** | `fct_pipeline_health` | state vectors and MB of Parquet |
 | **% missing position / callsign** | `fct_data_quality` | quality of the raw feed |
 | **Duplicates removed** | `fct_data_quality` | raw rows − cleaned rows |
-| **Data tests passed** | `dbt build` | 47 data tests (36 generic + 11 singular) on every hourly run |
+| **Data tests passed** | `dbt build` | 49 data tests (38 generic + 11 singular) on every hourly run |
 | **Airport movements per day** | `fct_airport_daily` | arrivals + departures at FRA and MUC, with % unknown origin/destination |
 | **Airport data freshness** | `assert_airport_data_is_fresh` | newest complete airport day ≤ 3 days old (warning) |
 | **Airport day completeness** | `fct_airport_daily.is_complete_day` | arrivals and departures each ≥ 50% of the airport's median day; incomplete days are flagged and excluded from averages (BUG-010) |
@@ -94,27 +94,40 @@ The pipeline measures itself. Every ingest run writes a metrics row (`raw/runs/`
 
 Reproduce every number with one command: `make measure` (runs [scripts/measure_pipeline.py](scripts/measure_pipeline.py)).
 
-## 4. Results (with numbers)
+## 4. Results (live, 30 Oct – 23 Nov 2026)
 
-> ⚠️ **Status: SYNTHETIC verification run (2026-10-28).** The numbers below come from 72 h of generated data pushed through the *real* serializer and dbt project. They prove the pipeline logic works. **Replace this table with live numbers after 7 days** (`make measure`) and change this note to "Live, <dates>".
+Collected on a laptop over 3.5 weeks; it was switched off on some days (college, travel), so live positions have gaps. Airport data has none, because those days are re-fetched later (catch-up). Reproduce with `make measure`.
 
 | Metric | Value |
 |---|---|
-| Days collected | 4 (72 h) |
-| Ingest runs landed | 433 |
-| Schedule completeness (full days) | 100.0% |
-| State vectors stored | 132,461 |
-| Storage used | 11.28 MB Parquet (~26 KB per snapshot) |
-| API latency avg / p95 | 514 ms / 911 ms *(simulated)* |
-| Unique aircraft seen | 400 |
-| Peak airborne aircraft in one hour | 275 |
-| Rows missing position | 2.09% |
-| dbt build | **60 / 60 PASS** (12 models, 1 seed, 47 tests) |
-| Unit tests | 31 passed (+1 DAG import test run in CI Docker job) |
-| **Negative test**: injected impossible snapshot (98,000 ft, 900 m/s, lat/lon swapped) | **systemic-glitch test FAILS → 18 downstream nodes SKIPPED → nothing published** ✅ |
-| **Real-world glitch handling** (found in live data, BUG-009) | 2 transponder glitches (> 750 kt) flagged and excluded, counted in `implausible_rows`, publish continues ✅ |
+| Days with live position data | **19** (3 full 24-hour days at 100% schedule completeness) |
+| Ingest runs landed | **1,540** (1 failed in 3.5 weeks) |
+| Aircraft positions (state vectors) stored | **468,417** (~290 aircraft per snapshot, up to ~560 at peak) |
+| Unique aircraft seen | **12,980** |
+| Peak airborne aircraft in one hour | **1,346** (1 Nov, 15:00 German time) |
+| Storage used | **36 MB** Parquet for all positions |
+| OpenSky API latency | avg **491 ms**, typical daily p95 **~665 ms** (worst day 3.0 s) |
+| Transforms published | **281** hourly builds; every one passed all tests before publishing |
+| Data quality | 0% missing positions · 1.15% missing callsigns · 0 duplicates · **106 transponder glitches** (0.023%) quarantined |
+| Flight phase mix | cruise 39% · descent 19% · ground 17% · climb 13% · level (low) 11% |
+| **Frankfurt (FRA)** | **25,126** movements in 24 days · avg **1,047/day** (959 – 1,169) |
+| **Munich (MUC)** | **18,541** movements in 24 days · avg **773/day** (687 – 887) |
+| Routes observed | **1,271** routes, **38,707** flights · busiest **FRA ⇄ MUC** (386 / 374), VIE → FRA (366) |
+| FRA hub pattern | arrivals peak 07:00–08:00, departure waves follow ~2 h later (German time) |
+| dbt build | **63 / 63 PASS** (13 models, 1 seed, 49 tests) |
+| Unit tests | **31 passed** (+1 DAG import test in the CI Docker job) |
 
-**Airports (synthetic verification, 3 days):** FRA ≈ 1,040 and MUC ≈ 790 movements/day; busiest routes LHR→FRA, FRA→LHR, MUC→FRA. A FRA→MUC flight appears in both airports' feeds and is counted **once** in `fct_routes` (tested). Live numbers replace these after the collection week.
+![Airports: Frankfurt & Munich](docs/img/airports.png)
+
+### Tested by real life (robustness)
+
+| What happened | What the pipeline did |
+|---|---|
+| Laptop off for days, battery died, Windows Update restarts | Resumed with `start.bat`; no corruption, no duplicates (deterministic file names); gaps visible as lower completeness, not hidden |
+| **Transponder glitches** (2 aircraft > 750 kt, BUG-009) | First blocked every publish; redesigned to quarantine single bad rows and block only systemic errors. 106 glitches caught since |
+| **OpenSky sent incomplete airport days** (8–12 Nov: FRA 1 arrival instead of ~540, BUG-010) | Volume check against each airport's median now flags such days; every run re-fetches the last 3 days. All 4 days repaired, and 2 "normal-looking" days gained ~15% more flights |
+| Code updated while containers ran old image | One task failed with ImportError; Airflow retried after the rebuild and succeeded |
+| Injected impossible snapshot (98,000 ft, 900 m/s, lat/lon swapped) | Systemic-glitch test FAILS → 18 downstream nodes SKIPPED → nothing published, dashboard kept the last good data |
 
 ## 5. Why it works
 
@@ -141,7 +154,17 @@ Reproduce every number with one command: `make measure` (runs [scripts/measure_p
 | Airport punctuality (compare with published schedules) | ADS-B gives actual times only; delays need schedule data |
 | Real Azure deployment (Container Apps + Storage) | Moves cloud from emulated to production |
 
-## 7. Run it
+## 7. Live demo and CI/CD
+
+- **Live demo:** _add your Streamlit Community Cloud link here_ — a frozen snapshot of the real results (3.4 MB, marts only, built with `scripts/make_demo_db.py`). No pipeline runs there, so it costs nothing and spends no API credits.
+- **CI** (`.github/workflows/ci.yml`, every push): ruff lint → 31 unit tests (OpenSky mocked) → dbt build with all 49 data tests on synthetic data → Docker build + Airflow DAG import check.
+- **CD** (`.github/workflows/release.yml`, every `v*` tag): builds the Airflow and dashboard images and publishes them to GitHub Container Registry:
+  ```bash
+  docker pull ghcr.io/chiranjeev89/opensky-flight-pipeline-dashboard:latest
+  docker pull ghcr.io/chiranjeev89/opensky-flight-pipeline-airflow:latest
+  ```
+
+## 8. Run it
 
 **Prerequisites:** Docker Desktop, Git, a free [OpenSky account](https://opensky-network.org) → Account → *API client* (client id + secret).
 
@@ -164,19 +187,20 @@ SERVING_DB_PATH=data/lake/serving.duckdb streamlit run dashboard/app.py
 
 **Use real Azure instead of Azurite:** put your storage account connection string in `AZURE_STORAGE_CONNECTION_STRING` in `.env`. No code changes are needed.
 
-## 8. Repo map
+## 9. Repo map
 
 ```
 src/flightpipe/     opensky_client.py · transform.py · storage.py · config.py   (all logic, unit-tested)
 airflow/dags/       opensky_ingest.py · flight_transform.py · airport_flights_daily.py   (wiring only)
 dbt/                models/staging · models/marts · seeds/airports.csv · tests · macros
 dashboard/app.py    Streamlit
-scripts/            generate_sample_data.py · measure_pipeline.py · inject_bad_snapshot.py
+scripts/            generate_sample_data.py · measure_pipeline.py · inject_bad_snapshot.py · make_demo_db.py
+demo/               serving_demo.duckdb (frozen results for the public demo)
 tests/              pytest (HTTP mocked)
 docs/               engineering record (below)
 ```
 
-## 9. Engineering record
+## 10. Engineering record
 
 Every decision in this repo is written down so I can defend it at a whiteboard:
 
@@ -186,6 +210,8 @@ Every decision in this repo is written down so I can defend it at a whiteboard:
 | What if someone acts maliciously? | [THREAT.md](docs/THREAT.md), [CONSTRAINTS.md](docs/CONSTRAINTS.md) |
 | What data structure, and why? | [DATA.md](docs/DATA.md), [FLOW.md](docs/FLOW.md) |
 | Where does it fail? | [FAILURE.md](docs/FAILURE.md), [TESTING.md](docs/TESTING.md), [ROLLBACK.md](docs/ROLLBACK.md) |
+| What is it for, and for whom? | [PRD.md](docs/PRD.md) |
+| How should the dashboard look? | [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) |
 | One-page brief | [defense/DEFENSE-flight-pipeline.md](docs/defense/DEFENSE-flight-pipeline.md) |
 
 Also: [OPERATIONS](docs/OPERATIONS.md) · [HANDOVER](docs/HANDOVER.md) · [ASSUMPTIONS](docs/ASSUMPTIONS.md) · [DEPENDENCIES](docs/DEPENDENCIES.md) · [features/](docs/features) · [bugs/](docs/bugs)

@@ -1,0 +1,15 @@
+# Dashboard theme (docs/DESIGN_SYSTEM.md). Read by `streamlit run` from the repo root,
+# by Streamlit Community Cloud, and copied into the dashboard Docker image.
+[theme]
+base = "dark"
+primaryColor = "#4DA3FF"            # sky blue: selected controls, links
+backgroundColor = "#0E1621"         # night-sky navy
+secondaryBackgroundColor = "#17212E"
+textColor = "#E6EDF3"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

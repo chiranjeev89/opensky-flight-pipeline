@@ -22,7 +22,8 @@ Exists so "measure" numbers come from data, not from reading Airflow logs.
 | fct_traffic_hourly | hour | table | unique hour |
 | dim_aircraft | transponder | table | unique icao24 |
 | fct_country_mix | country | table | unique country |
-| fct_pipeline_health | day | table | unique day |
+| fct_phase_mix | flight phase | table | unique flight_phase |
+| fct_pipeline_health | day (`completeness_pct` = distinct 10-min slots / 144, capped at 100) | table | unique day |
 | fct_data_quality | day | table | unique day |
 
 - **Why DuckDB**: single-file, columnar, zero server, reads Parquet directly, free. Trade-off: **one writer at a time** → solved with the serving copy (D-006).

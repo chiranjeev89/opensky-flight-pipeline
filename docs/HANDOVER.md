@@ -1,6 +1,14 @@
 # HANDOVER
 Newest entry on top. Read this + ARCHITECTURE.md + CONSTRAINTS.md first, update this last.
 
+## 2026-11-23 (v1.0)
+Done:
+- BUG-010 repaired live: 24/24 airport days complete; CI #5 green.
+- Added fct_phase_mix, slot-based completeness, demo snapshot + demo mode, dark theme, release.yml (GHCR), PRD.md, DESIGN_SYSTEM.md, D-016, FEATURE-005.
+- README results section now uses the live numbers (30 Oct - 23 Nov).
+Next:
+- User: screenshots to docs/img, start.bat, copy release.yml, push, deploy demo, tag v1.0.0.
+
 ## 2026-11-23
 Done:
 - Reviewed 3.5 weeks of live logs: 1,534 ingest runs (1 failed), 465,351 positions, 281 published transforms, 24 airport days.

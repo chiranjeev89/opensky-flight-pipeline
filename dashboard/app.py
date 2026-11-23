@@ -16,8 +16,21 @@ import pandas as pd
 import streamlit as st
 
 DB_PATH = os.getenv("SERVING_DB_PATH", "/opt/lake/serving.duckdb")
+# Public demo (Streamlit Community Cloud): no pipeline runs there, so fall back to a
+# frozen snapshot of the marts committed in demo/ (built by scripts/make_demo_db.py).
+DEMO_DB = Path(__file__).resolve().parents[1] / "demo" / "serving_demo.duckdb"
+IS_DEMO = not Path(DB_PATH).exists() and DEMO_DB.exists()
+if IS_DEMO:
+    DB_PATH = str(DEMO_DB)
 
 st.set_page_config(page_title="Flight Ops over Germany", layout="wide")
+
+# Colour tokens from docs/DESIGN_SYSTEM.md (theme itself lives in .streamlit/config.toml).
+ARRIVAL = "#8EC5FF"  # light sky blue
+DEPARTURE = "#1F6FEB"  # deep blue
+SERIES_2 = "#F2A33A"  # amber: second series / warning
+COMPLETE = "#3FB950"  # semantic ok
+INCOMPLETE = "#F2A33A"  # semantic warning
 
 
 @st.cache_data(ttl=300)  # 5 min cache: data only changes hourly, protects the DB from refresh spam
@@ -30,6 +43,11 @@ def query(sql: str, params: tuple = ()) -> pd.DataFrame:
 
 st.title("✈️ Flight Operations over Germany")
 st.caption("Live ADS-B data from the OpenSky Network · Airflow → Azure Blob → dbt → DuckDB")
+if IS_DEMO:
+    st.info(
+        "Demo snapshot: frozen results from the live pipeline (30 Oct – 23 Nov 2026). "
+        "The full pipeline runs in Docker; see github.com/chiranjeev89/opensky-flight-pipeline."
+    )
 
 if not Path(DB_PATH).exists():
     st.warning("No data published yet. The first dbt run publishes serving.duckdb at :05 past the hour.")
@@ -48,21 +66,27 @@ c3.metric("p95 API latency (today)", p95)
 c4.metric("Data as of (UTC)", f"{pd.Timestamp(newest):%Y-%m-%d %H:%M}")
 
 st.subheader("Airborne aircraft per hour")
-st.line_chart(traffic.set_index("snapshot_hour")[["airborne_aircraft", "unique_aircraft"]])
+st.line_chart(
+    traffic.set_index("snapshot_hour")[["airborne_aircraft", "unique_aircraft"]], color=[DEPARTURE, SERIES_2]
+)
 
 left, right = st.columns(2)
 with left:
     st.subheader("Flight phase mix")
-    phases = query(
-        "select flight_phase, count(*) as observations from fct_flight_phases group by 1 order by 2 desc"
-    )
-    st.bar_chart(phases.set_index("flight_phase"))
+    try:
+        phases = query("select flight_phase, observations from fct_phase_mix order by 2 desc")
+    except duckdb.CatalogException:  # database published before fct_phase_mix existed
+        phases = query(
+            "select flight_phase, count(*) as observations from fct_flight_phases group by 1 order by 2 desc"
+        )
+    st.bar_chart(phases.set_index("flight_phase"), color=DEPARTURE)
 with right:
     st.subheader("Top registration countries")
     st.bar_chart(
         query(
             "select origin_country, unique_aircraft from fct_country_mix order by 2 desc limit 10"
-        ).set_index("origin_country")
+        ).set_index("origin_country"),
+        color=DEPARTURE,
     )
 
 st.subheader("Latest snapshot positions")
@@ -128,7 +152,7 @@ else:
             prof = query(profile_sql.format(extra="and is_complete_day"), (choice,))
         except duckdb.BinderException:  # serving DB published before BUG-010
             prof = query(profile_sql.format(extra=""), (choice,))
-        st.bar_chart(prof.set_index("hour"), stack=False)
+        st.bar_chart(prof.set_index("hour"), stack=False, color=[ARRIVAL, DEPARTURE])
         st.caption("Average over complete days only. Hours in Europe/Berlin time.")
     with a2:
         st.subheader("Busiest routes")
@@ -143,11 +167,14 @@ else:
         st.caption("median_min = time OpenSky's receivers saw the flight, not gate-to-gate block time.")
 
     st.subheader(f"Movements per day: {AIRPORT_NAMES.get(choice, choice)}")
-    per_day = d.assign(
-        day=d["flight_date"].astype(str),  # text labels -> full-width bars
-        status=d["is_complete_day"].map({True: "complete", False: "incomplete (OpenSky gap)"}),
-    )
-    st.bar_chart(per_day, x="day", y="movements", color="status")
+    per_day = pd.DataFrame(
+        {
+            "day": d["flight_date"].astype(str),  # text labels -> full-width bars
+            "complete": d["movements"].where(d["is_complete_day"]),
+            "incomplete (OpenSky gap)": d["movements"].where(~d["is_complete_day"]),
+        }
+    ).set_index("day")
+    st.bar_chart(per_day, color=[COMPLETE, INCOMPLETE])
 
 st.subheader("Data freshness")
 fresh = [

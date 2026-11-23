@@ -9,6 +9,11 @@ models:
           - accepted_values:
               arguments:
                 values: ["ground", "climb", "descent", "cruise", "level_low", "unknown"]
+  - name: fct_phase_mix
+    description: Share of observations per flight phase (small table for the dashboard and demo).
+    columns:
+      - name: flight_phase
+        data_tests: [not_null, unique]
   - name: fct_traffic_hourly
     description: Headline metric. One row per hour.
     columns:

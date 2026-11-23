@@ -3,6 +3,7 @@ WORKDIR /app
 COPY requirements-dashboard.txt .
 RUN pip install --no-cache-dir -r requirements-dashboard.txt
 COPY dashboard/app.py .
+COPY .streamlit .streamlit
 # Non-root user: the dashboard only needs to READ the serving DB (T-04)
 RUN useradd -m viewer
 USER viewer

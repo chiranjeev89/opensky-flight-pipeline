@@ -98,3 +98,13 @@ Chosen: 3
 Why: Failing would freeze the live dashboard over a third-party gap (same lesson as BUG-009). Retrying one day cannot tell "late" from "really quiet". A rolling re-fetch fixes late data for free, the median baseline is robust to a few bad days, and nothing is hidden.
 Trade-off: 3x the airport API calls (~360/4,000 credits). A genuinely quiet day (strike, storm) below 50% of normal would be flagged as incomplete; the warning lists it, so a human can judge.
 Revisit if: more airports are added (credits scale with airports x lookback) or OpenSky publishes a "batch complete" signal.
+
+## D-016: Frozen demo snapshot + images on release (CD) + slot-based completeness
+Date: 2026-11-23
+Context: Reviewers cannot run Docker and OpenSky keys to see the result. Real Azure and paid hosting are out of budget (NFR-1). Manual runs from start.bat pushed completeness above 100%.
+Options: 1) screenshots only  2) host the full pipeline on a paid VM  3) free Streamlit Community Cloud reading a small read-only snapshot of the real serving DB, plus GHCR images built on every release
+Chosen: 3
+Why: Free, honest (the banner says "frozen snapshot"), same dashboard code as Docker. `scripts/make_demo_db.py` copies mart tables and only the latest snapshot of fct_flight_phases (29 MB -> 3.4 MB). Completeness counts distinct 10-minute slots, so manual runs cannot inflate it.
+Trade-off: The online demo does not update; it shows 30 Oct - 23 Nov 2026 only.
+Revisit if: a free always-on host appears or the project gets a cloud budget.
+

@@ -13,3 +13,6 @@ data/lake/
 .venv/
 *.log
 start-fix/
+
+# Public demo snapshot (small, marts only) is committed on purpose
+!demo/serving_demo.duckdb

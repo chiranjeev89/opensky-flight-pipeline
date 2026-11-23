@@ -55,3 +55,12 @@ dbt build (clean synthetic): PASS=60 · with one cut day: PASS=59 WARN=1
 airport DAG vs Azurite + fake OpenSky: success, 12 calls for 20/21/22 Nov
 dashboard AppTest: no exceptions on new DB (warning shown) and on pre-BUG-010 DB
 ```
+
+## Verified run (2026-11-23, v1.0 finishing)
+```
+ruff: clean · pytest: 31 passed, 1 skipped
+dbt build (clean synthetic): PASS=63 (13 models, 1 seed, 49 tests)
+dashboard AppTest: no exceptions on live DB and in demo mode (demo/serving_demo.duckdb)
+demo DB built from the real live serving.duckdb: 3.4 MB
+```
+
